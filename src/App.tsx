@@ -12,6 +12,9 @@ import Opportunities from "./pages/Opportunities";
 import Applications from "./pages/Applications";
 import Messages from "./pages/Messages";
 import Notifications from "./pages/Notifications";
+import CreateOpportunity from "./pages/CreateOpportunity";
+import ManageOpportunities from "./pages/ManageOpportunities";
+import OpportunityApplications from "./pages/OpportunityApplications";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +32,9 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/opportunities" element={<Opportunities />} />
+            <Route path="/opportunities/create" element={<CreateOpportunity />} />
+            <Route path="/opportunities/manage" element={<ManageOpportunities />} />
+            <Route path="/opportunities/:id/applications" element={<OpportunityApplications />} />
             <Route path="/applications" element={<Applications />} />
             <Route path="/messages" element={<Messages />} />
             <Route path="/notifications" element={<Notifications />} />
