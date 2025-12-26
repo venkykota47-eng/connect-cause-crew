@@ -283,6 +283,7 @@ export type Database = {
         Args: { notification_user_id: string }
         Returns: boolean
       }
+      user_owns_profile: { Args: { profile_id: string }; Returns: boolean }
     }
     Enums: {
       user_role: "volunteer" | "ngo"
