@@ -9,11 +9,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Navigate } from "react-router-dom";
 import { User, Building2, MapPin, Phone, Globe, X, Plus } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { volunteerProfileSchema, ngoProfileSchema, validateForm } from "@/lib/validations";
 
 export default function Profile() {
   const { profile, updateProfile, loading } = useAuth();
+  const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [newSkill, setNewSkill] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [formData, setFormData] = useState({
     full_name: profile?.full_name || "",
@@ -47,6 +51,42 @@ export default function Profile() {
   const isNGO = profile.role === "ngo";
 
   const handleSave = async () => {
+    // Validate based on role
+    const schema = isNGO ? ngoProfileSchema : volunteerProfileSchema;
+    const dataToValidate = isNGO 
+      ? {
+          full_name: formData.full_name,
+          bio: formData.bio,
+          location: formData.location,
+          phone: formData.phone,
+          organization_name: formData.organization_name,
+          website: formData.website,
+          mission: formData.mission,
+          founded_year: formData.founded_year,
+          team_size: formData.team_size,
+        }
+      : {
+          full_name: formData.full_name,
+          bio: formData.bio,
+          location: formData.location,
+          phone: formData.phone,
+          skills: formData.skills,
+          experience_years: formData.experience_years,
+          availability: formData.availability,
+        };
+    
+    const validation = validateForm(schema, dataToValidate);
+    if (!validation.success) {
+      setErrors(validation.errors);
+      toast({
+        title: "Validation Error",
+        description: "Please check the form for errors",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setErrors({});
     setSaving(true);
     try {
       await updateProfile(formData);
@@ -101,6 +141,7 @@ export default function Profile() {
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     placeholder="+1 234 567 8900"
                   />
+                  {errors.phone && <p className="text-sm text-destructive">{errors.phone}</p>}
                 </div>
               </div>
               
@@ -115,6 +156,7 @@ export default function Profile() {
                     placeholder="City, Country"
                     className="pl-10"
                   />
+                  {errors.full_name && <p className="text-sm text-destructive">{errors.full_name}</p>}
                 </div>
               </div>
               

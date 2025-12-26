@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/select";
 import { X } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
+import { opportunitySchema, validateForm } from "@/lib/validations";
 
 type Opportunity = Tables<"opportunities"> & {
   applications_count?: number;
@@ -61,6 +62,7 @@ export default function ManageOpportunities() {
   const [isLoading, setIsLoading] = useState(true);
   const [editingOpportunity, setEditingOpportunity] = useState<Opportunity | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editErrors, setEditErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (profile?.id) {
@@ -160,20 +162,46 @@ export default function ManageOpportunities() {
     e.preventDefault();
     if (!editingOpportunity) return;
 
+    // Validate form data
+    const formDataToValidate = {
+      title: editingOpportunity.title,
+      description: editingOpportunity.description,
+      location: editingOpportunity.location,
+      commitment_type: editingOpportunity.commitment_type as "one-time" | "short-term" | "long-term",
+      hours_per_week: editingOpportunity.hours_per_week || 1,
+      spots_available: editingOpportunity.spots_available || 1,
+      is_remote: editingOpportunity.is_remote || false,
+      start_date: editingOpportunity.start_date || "",
+      end_date: editingOpportunity.end_date || "",
+      skills_required: editingOpportunity.skills_required || [],
+    };
+
+    const validation = validateForm(opportunitySchema, formDataToValidate);
+    if (!validation.success) {
+      setEditErrors(validation.errors);
+      toast({
+        title: "Validation Error",
+        description: "Please check the form for errors",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setEditErrors({});
     try {
       const { error } = await supabase
         .from("opportunities")
         .update({
-          title: editingOpportunity.title,
-          description: editingOpportunity.description,
-          location: editingOpportunity.location,
-          commitment_type: editingOpportunity.commitment_type,
-          hours_per_week: editingOpportunity.hours_per_week,
-          spots_available: editingOpportunity.spots_available,
-          is_remote: editingOpportunity.is_remote,
-          start_date: editingOpportunity.start_date,
-          end_date: editingOpportunity.end_date,
-          skills_required: editingOpportunity.skills_required,
+          title: validation.data!.title,
+          description: validation.data!.description,
+          location: validation.data!.location,
+          commitment_type: validation.data!.commitment_type,
+          hours_per_week: validation.data!.hours_per_week,
+          spots_available: validation.data!.spots_available,
+          is_remote: validation.data!.is_remote,
+          start_date: validation.data!.start_date || null,
+          end_date: validation.data!.end_date || null,
+          skills_required: validation.data!.skills_required,
         })
         .eq("id", editingOpportunity.id);
 
@@ -378,6 +406,7 @@ export default function ManageOpportunities() {
                                   onChange={(e) => setEditingOpportunity({ ...editingOpportunity, title: e.target.value })}
                                   required
                                 />
+                                {editErrors.title && <p className="text-sm text-destructive">{editErrors.title}</p>}
                               </div>
                               <div className="space-y-2">
                                 <Label htmlFor="edit-description">Description</Label>
@@ -388,6 +417,7 @@ export default function ManageOpportunities() {
                                   rows={4}
                                   required
                                 />
+                                {editErrors.description && <p className="text-sm text-destructive">{editErrors.description}</p>}
                               </div>
                               <div className="grid md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
@@ -398,6 +428,7 @@ export default function ManageOpportunities() {
                                     onChange={(e) => setEditingOpportunity({ ...editingOpportunity, location: e.target.value })}
                                     required
                                   />
+                                  {editErrors.location && <p className="text-sm text-destructive">{editErrors.location}</p>}
                                 </div>
                                 <div className="flex items-center justify-between p-4 border rounded-lg">
                                   <Label htmlFor="edit-remote">Remote</Label>

@@ -8,10 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users, Building2, ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
-import { z } from "zod";
-
-const emailSchema = z.string().email("Please enter a valid email address");
-const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
+import { signInSchema, signUpSchema, validateForm } from "@/lib/validations";
 
 export default function Auth() {
   const [searchParams] = useSearchParams();
@@ -33,30 +30,15 @@ export default function Auth() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validate = () => {
-    const newErrors: Record<string, string> = {};
-    
-    try {
-      emailSchema.parse(email);
-    } catch (e) {
-      if (e instanceof z.ZodError) newErrors.email = e.errors[0].message;
+    if (mode === "signin") {
+      const result = validateForm(signInSchema, { email, password });
+      setErrors(result.errors);
+      return result.success;
+    } else {
+      const result = validateForm(signUpSchema, { email, password, fullName, role, orgName });
+      setErrors(result.errors);
+      return result.success;
     }
-    
-    try {
-      passwordSchema.parse(password);
-    } catch (e) {
-      if (e instanceof z.ZodError) newErrors.password = e.errors[0].message;
-    }
-    
-    if (mode === "signup" && !fullName.trim()) {
-      newErrors.fullName = "Full name is required";
-    }
-    
-    if (mode === "signup" && role === "ngo" && !orgName.trim()) {
-      newErrors.orgName = "Organization name is required";
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
