@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { opportunitySchema, validateForm } from "@/lib/validations";
 
 const allSkills = [
   "Web Development", "Mobile Development", "Data Analysis", "Marketing",
@@ -31,12 +32,13 @@ export default function CreateOpportunity() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     location: "",
-    commitment_type: "one-time" as string,
+    commitment_type: "one-time" as "one-time" | "short-term" | "long-term",
     hours_per_week: 5,
     spots_available: 1,
     is_remote: false,
@@ -50,10 +52,32 @@ export default function CreateOpportunity() {
     
     if (!profile) return;
 
+    // Validate form data
+    const validation = validateForm(opportunitySchema, formData);
+    if (!validation.success) {
+      setErrors(validation.errors);
+      toast({
+        title: "Validation Error",
+        description: "Please check the form for errors",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setErrors({});
     setIsSubmitting(true);
     try {
       const { error } = await supabase.from("opportunities").insert({
-        ...formData,
+        title: validation.data!.title,
+        description: validation.data!.description,
+        location: validation.data!.location,
+        commitment_type: validation.data!.commitment_type,
+        hours_per_week: validation.data!.hours_per_week,
+        spots_available: validation.data!.spots_available,
+        is_remote: validation.data!.is_remote,
+        start_date: validation.data!.start_date || null,
+        end_date: validation.data!.end_date || null,
+        skills_required: validation.data!.skills_required,
         ngo_id: profile.id,
         status: "open",
       });
@@ -141,6 +165,7 @@ export default function CreateOpportunity() {
                   placeholder="e.g., Community Garden Volunteer Coordinator"
                   required
                 />
+                {errors.title && <p className="text-sm text-destructive">{errors.title}</p>}
               </div>
 
               {/* Description */}
@@ -154,6 +179,7 @@ export default function CreateOpportunity() {
                   rows={5}
                   required
                 />
+                {errors.description && <p className="text-sm text-destructive">{errors.description}</p>}
               </div>
 
               {/* Location & Remote */}
@@ -167,6 +193,7 @@ export default function CreateOpportunity() {
                     placeholder="City, Country"
                     required
                   />
+                  {errors.location && <p className="text-sm text-destructive">{errors.location}</p>}
                 </div>
                 <div className="flex items-center justify-between p-4 border rounded-lg">
                   <Label htmlFor="is_remote" className="cursor-pointer">
@@ -188,7 +215,7 @@ export default function CreateOpportunity() {
                   <Label>Commitment Type *</Label>
                   <Select
                     value={formData.commitment_type}
-                    onValueChange={(value) =>
+                    onValueChange={(value: "one-time" | "short-term" | "long-term") =>
                       setFormData({ ...formData, commitment_type: value })
                     }
                   >
