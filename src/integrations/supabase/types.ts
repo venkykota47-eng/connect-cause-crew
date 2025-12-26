@@ -275,7 +275,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_public_profile_fields: {
+        Args: { profile_row: Database["public"]["Tables"]["profiles"]["Row"] }
+        Returns: Json
+      }
+      user_owns_notification: {
+        Args: { notification_user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       user_role: "volunteer" | "ngo"
