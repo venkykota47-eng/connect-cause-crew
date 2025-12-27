@@ -34,6 +34,8 @@ interface AuthContextType {
   signUp: (email: string, password: string, role: UserRole, fullName: string, orgName?: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -162,6 +164,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     toast.success("Signed out successfully");
   };
 
+  const resetPassword = async (email: string) => {
+    const redirectUrl = `${window.location.origin}/auth?mode=reset`;
+    
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: redirectUrl,
+    });
+
+    if (error) {
+      toast.error(error.message);
+      throw error;
+    }
+
+    toast.success("Password reset email sent! Check your inbox.");
+  };
+
+  const updatePassword = async (password: string) => {
+    const { error } = await supabase.auth.updateUser({ password });
+
+    if (error) {
+      toast.error(error.message);
+      throw error;
+    }
+
+    toast.success("Password updated successfully!");
+  };
+
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!profile) return;
 
@@ -189,6 +217,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signUp,
         signIn,
         signOut,
+        resetPassword,
+        updatePassword,
         updateProfile,
         refreshProfile,
       }}
