@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -10,14 +10,25 @@ import { Users, Building2, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { Link } from "react-router-dom";
 import { signInSchema, signUpSchema, validateForm } from "@/lib/validations";
 import { PasswordStrengthIndicator } from "@/components/PasswordStrengthIndicator";
+import { z } from "zod";
+
+const emailSchema = z.object({
+  email: z.string().trim().email("Please enter a valid email"),
+});
+
+const newPasswordSchema = z.object({
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
 
 export default function Auth() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, resetPassword, updatePassword } = useAuth();
   
-  const [mode, setMode] = useState<"signin" | "signup">(
-    searchParams.get("mode") === "signup" ? "signup" : "signin"
+  const [mode, setMode] = useState<"signin" | "signup" | "forgot" | "reset">(
+    searchParams.get("mode") === "signup" ? "signup" : 
+    searchParams.get("mode") === "forgot" ? "forgot" :
+    searchParams.get("mode") === "reset" ? "reset" : "signin"
   );
   const [role, setRole] = useState<"volunteer" | "ngo">(
     (searchParams.get("role") as "volunteer" | "ngo") || "volunteer"
@@ -31,16 +42,53 @@ export default function Auth() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = useState(false);
 
+  // Update mode when URL params change (for password reset callback)
+  useEffect(() => {
+    const urlMode = searchParams.get("mode");
+    if (urlMode === "reset") {
+      setMode("reset");
+    }
+  }, [searchParams]);
+
   const validate = () => {
     if (mode === "signin") {
       const result = validateForm(signInSchema, { email, password });
       setErrors(result.errors);
       return result.success;
-    } else {
+    } else if (mode === "signup") {
       const result = validateForm(signUpSchema, { email, password, fullName, role, orgName });
       setErrors(result.errors);
       return result.success;
+    } else if (mode === "forgot") {
+      const result = emailSchema.safeParse({ email });
+      if (!result.success) {
+        const fieldErrors: Record<string, string> = {};
+        result.error.errors.forEach((err) => {
+          if (err.path[0]) {
+            fieldErrors[err.path[0] as string] = err.message;
+          }
+        });
+        setErrors(fieldErrors);
+        return false;
+      }
+      setErrors({});
+      return true;
+    } else if (mode === "reset") {
+      const result = newPasswordSchema.safeParse({ password });
+      if (!result.success) {
+        const fieldErrors: Record<string, string> = {};
+        result.error.errors.forEach((err) => {
+          if (err.path[0]) {
+            fieldErrors[err.path[0] as string] = err.message;
+          }
+        });
+        setErrors(fieldErrors);
+        return false;
+      }
+      setErrors({});
+      return true;
     }
+    return false;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -51,16 +99,261 @@ export default function Auth() {
     try {
       if (mode === "signin") {
         await signIn(email, password);
-      } else {
+        navigate("/dashboard");
+      } else if (mode === "signup") {
         await signUp(email, password, role, fullName, orgName);
+        navigate("/dashboard");
+      } else if (mode === "forgot") {
+        await resetPassword(email);
+        setMode("signin");
+      } else if (mode === "reset") {
+        await updatePassword(password);
+        navigate("/dashboard");
       }
-      navigate("/dashboard");
     } catch (error) {
       // Error handled in context
     } finally {
       setLoading(false);
     }
   };
+
+  const renderForgotPassword = () => (
+    <Card className="shadow-xl">
+      <CardHeader className="text-center">
+        <Link to="/" className="flex items-center justify-center gap-2 mb-4">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg gradient-primary">
+            <span className="text-xl font-bold text-primary-foreground">S</span>
+          </div>
+        </Link>
+        <CardTitle className="text-2xl font-display">Reset Password</CardTitle>
+        <CardDescription>
+          Enter your email and we'll send you a reset link
+        </CardDescription>
+      </CardHeader>
+      
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+            />
+            {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
+          </div>
+          
+          <Button type="submit" className="w-full" variant="hero" disabled={loading}>
+            {loading ? "Sending..." : "Send Reset Link"}
+          </Button>
+          
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full"
+            onClick={() => setMode("signin")}
+          >
+            Back to Sign In
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+
+  const renderResetPassword = () => (
+    <Card className="shadow-xl">
+      <CardHeader className="text-center">
+        <Link to="/" className="flex items-center justify-center gap-2 mb-4">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg gradient-primary">
+            <span className="text-xl font-bold text-primary-foreground">S</span>
+          </div>
+        </Link>
+        <CardTitle className="text-2xl font-display">Set New Password</CardTitle>
+        <CardDescription>
+          Enter your new password below
+        </CardDescription>
+      </CardHeader>
+      
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="password">New Password</Label>
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="pr-10"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <Eye className="h-4 w-4 text-muted-foreground" />
+                )}
+                <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
+              </Button>
+            </div>
+            {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
+            <PasswordStrengthIndicator password={password} />
+          </div>
+          
+          <Button type="submit" className="w-full" variant="hero" disabled={loading}>
+            {loading ? "Updating..." : "Update Password"}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+
+  const renderAuthForm = () => (
+    <Card className="shadow-xl">
+      <CardHeader className="text-center">
+        <Link to="/" className="flex items-center justify-center gap-2 mb-4">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg gradient-primary">
+            <span className="text-xl font-bold text-primary-foreground">S</span>
+          </div>
+        </Link>
+        <CardTitle className="text-2xl font-display">
+          {mode === "signin" ? "Welcome Back" : "Join SkillBridge"}
+        </CardTitle>
+        <CardDescription>
+          {mode === "signin" 
+            ? "Sign in to continue your journey" 
+            : "Create an account to get started"}
+        </CardDescription>
+      </CardHeader>
+      
+      <CardContent>
+        <Tabs value={mode} onValueChange={(v) => setMode(v as "signin" | "signup")}>
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="signin">Sign In</TabsTrigger>
+            <TabsTrigger value="signup">Sign Up</TabsTrigger>
+          </TabsList>
+          
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {mode === "signup" && (
+              <>
+                {/* Role Selection */}
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    type="button"
+                    variant={role === "volunteer" ? "default" : "outline"}
+                    className="h-auto py-4 flex-col gap-2"
+                    onClick={() => setRole("volunteer")}
+                  >
+                    <Users className="w-5 h-5" />
+                    <span>Volunteer</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={role === "ngo" ? "secondary" : "outline"}
+                    className="h-auto py-4 flex-col gap-2"
+                    onClick={() => setRole("ngo")}
+                  >
+                    <Building2 className="w-5 h-5" />
+                    <span>NGO</span>
+                  </Button>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="fullName">Full Name</Label>
+                  <Input
+                    id="fullName"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="John Doe"
+                  />
+                  {errors.fullName && <p className="text-sm text-destructive">{errors.fullName}</p>}
+                </div>
+                
+                {role === "ngo" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="orgName">Organization Name</Label>
+                    <Input
+                      id="orgName"
+                      value={orgName}
+                      onChange={(e) => setOrgName(e.target.value)}
+                      placeholder="Your NGO Name"
+                    />
+                    {errors.orgName && <p className="text-sm text-destructive">{errors.orgName}</p>}
+                  </div>
+                )}
+              </>
+            )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+              />
+              {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
+            </div>
+            
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                {mode === "signin" && (
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="px-0 h-auto text-sm text-muted-foreground hover:text-primary"
+                    onClick={() => setMode("forgot")}
+                  >
+                    Forgot password?
+                  </Button>
+                )}
+              </div>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
+                </Button>
+              </div>
+              {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
+              {mode === "signup" && <PasswordStrengthIndicator password={password} />}
+            </div>
+            
+            <Button type="submit" className="w-full" variant="hero" disabled={loading}>
+              {loading ? "Please wait..." : mode === "signin" ? "Sign In" : "Create Account"}
+            </Button>
+          </form>
+        </Tabs>
+      </CardContent>
+    </Card>
+  );
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-soft via-background to-secondary-soft p-4">
@@ -73,130 +366,9 @@ export default function Auth() {
           Back to Home
         </Link>
         
-        <Card className="shadow-xl">
-          <CardHeader className="text-center">
-            <Link to="/" className="flex items-center justify-center gap-2 mb-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg gradient-primary">
-                <span className="text-xl font-bold text-primary-foreground">S</span>
-              </div>
-            </Link>
-            <CardTitle className="text-2xl font-display">
-              {mode === "signin" ? "Welcome Back" : "Join SkillBridge"}
-            </CardTitle>
-            <CardDescription>
-              {mode === "signin" 
-                ? "Sign in to continue your journey" 
-                : "Create an account to get started"}
-            </CardDescription>
-          </CardHeader>
-          
-          <CardContent>
-            <Tabs value={mode} onValueChange={(v) => setMode(v as "signin" | "signup")}>
-              <TabsList className="grid w-full grid-cols-2 mb-6">
-                <TabsTrigger value="signin">Sign In</TabsTrigger>
-                <TabsTrigger value="signup">Sign Up</TabsTrigger>
-              </TabsList>
-              
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {mode === "signup" && (
-                  <>
-                    {/* Role Selection */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <Button
-                        type="button"
-                        variant={role === "volunteer" ? "default" : "outline"}
-                        className="h-auto py-4 flex-col gap-2"
-                        onClick={() => setRole("volunteer")}
-                      >
-                        <Users className="w-5 h-5" />
-                        <span>Volunteer</span>
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={role === "ngo" ? "secondary" : "outline"}
-                        className="h-auto py-4 flex-col gap-2"
-                        onClick={() => setRole("ngo")}
-                      >
-                        <Building2 className="w-5 h-5" />
-                        <span>NGO</span>
-                      </Button>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="fullName">Full Name</Label>
-                      <Input
-                        id="fullName"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        placeholder="John Doe"
-                      />
-                      {errors.fullName && <p className="text-sm text-destructive">{errors.fullName}</p>}
-                    </div>
-                    
-                    {role === "ngo" && (
-                      <div className="space-y-2">
-                        <Label htmlFor="orgName">Organization Name</Label>
-                        <Input
-                          id="orgName"
-                          value={orgName}
-                          onChange={(e) => setOrgName(e.target.value)}
-                          placeholder="Your NGO Name"
-                        />
-                        {errors.orgName && <p className="text-sm text-destructive">{errors.orgName}</p>}
-                      </div>
-                    )}
-                  </>
-                )}
-                
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                  />
-                  {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="pr-10"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <Eye className="h-4 w-4 text-muted-foreground" />
-                      )}
-                      <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
-                    </Button>
-                  </div>
-                  {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
-                  {mode === "signup" && <PasswordStrengthIndicator password={password} />}
-                </div>
-                
-                <Button type="submit" className="w-full" variant="hero" disabled={loading}>
-                  {loading ? "Please wait..." : mode === "signin" ? "Sign In" : "Create Account"}
-                </Button>
-              </form>
-            </Tabs>
-          </CardContent>
-        </Card>
+        {mode === "forgot" && renderForgotPassword()}
+        {mode === "reset" && renderResetPassword()}
+        {(mode === "signin" || mode === "signup") && renderAuthForm()}
       </div>
     </div>
   );
