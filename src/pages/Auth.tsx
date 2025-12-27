@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users, Building2, ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 import { signInSchema, signUpSchema, validateForm } from "@/lib/validations";
+import { PasswordStrengthIndicator } from "@/components/PasswordStrengthIndicator";
 
 export default function Auth() {
   const [searchParams] = useSearchParams();
@@ -168,6 +169,7 @@ export default function Auth() {
                     placeholder="••••••••"
                   />
                   {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
+                  {mode === "signup" && <PasswordStrengthIndicator password={password} />}
                 </div>
                 
                 <Button type="submit" className="w-full" variant="hero" disabled={loading}>
