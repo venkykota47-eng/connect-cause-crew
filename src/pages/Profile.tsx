@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,33 +6,56 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Navigate } from "react-router-dom";
-import { User, Building2, MapPin, Phone, Globe, X, Plus } from "lucide-react";
+import { User, Building2, MapPin, Globe } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { volunteerProfileSchema, ngoProfileSchema, validateForm } from "@/lib/validations";
+import { AvatarUpload } from "@/components/profile/AvatarUpload";
+import { SkillsTagInput } from "@/components/profile/SkillsTagInput";
+import { AvailabilityPicker } from "@/components/profile/AvailabilityPicker";
 
 export default function Profile() {
-  const { profile, updateProfile, loading } = useAuth();
+  const { profile, user, updateProfile, loading } = useAuth();
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
-  const [newSkill, setNewSkill] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [formData, setFormData] = useState({
-    full_name: profile?.full_name || "",
-    bio: profile?.bio || "",
-    location: profile?.location || "",
-    phone: profile?.phone || "",
-    skills: profile?.skills || [],
-    experience_years: profile?.experience_years || 0,
-    availability: profile?.availability || "",
-    organization_name: profile?.organization_name || "",
-    website: profile?.website || "",
-    mission: profile?.mission || "",
-    founded_year: profile?.founded_year || new Date().getFullYear(),
-    team_size: profile?.team_size || 0,
+    full_name: "",
+    bio: "",
+    location: "",
+    phone: "",
+    skills: [] as string[],
+    experience_years: 0,
+    availability: "",
+    organization_name: "",
+    website: "",
+    mission: "",
+    founded_year: new Date().getFullYear(),
+    team_size: 0,
+    avatar_url: null as string | null,
   });
+
+  // Initialize form data when profile loads
+  useEffect(() => {
+    if (profile) {
+      setFormData({
+        full_name: profile.full_name || "",
+        bio: profile.bio || "",
+        location: profile.location || "",
+        phone: profile.phone || "",
+        skills: profile.skills || [],
+        experience_years: profile.experience_years || 0,
+        availability: profile.availability || "",
+        organization_name: profile.organization_name || "",
+        website: profile.website || "",
+        mission: profile.mission || "",
+        founded_year: profile.founded_year || new Date().getFullYear(),
+        team_size: profile.team_size || 0,
+        avatar_url: profile.avatar_url || null,
+      });
+    }
+  }, [profile]);
 
   if (loading) {
     return (
@@ -44,14 +67,13 @@ export default function Profile() {
     );
   }
 
-  if (!profile) {
+  if (!profile || !user) {
     return <Navigate to="/auth" replace />;
   }
 
   const isNGO = profile.role === "ngo";
 
   const handleSave = async () => {
-    // Validate based on role
     const schema = isNGO ? ngoProfileSchema : volunteerProfileSchema;
     const dataToValidate = isNGO 
       ? {
@@ -95,15 +117,10 @@ export default function Profile() {
     }
   };
 
-  const addSkill = () => {
-    if (newSkill.trim() && !formData.skills.includes(newSkill.trim())) {
-      setFormData({ ...formData, skills: [...formData.skills, newSkill.trim()] });
-      setNewSkill("");
-    }
-  };
-
-  const removeSkill = (skill: string) => {
-    setFormData({ ...formData, skills: formData.skills.filter((s) => s !== skill) });
+  const handleAvatarChange = (url: string) => {
+    setFormData({ ...formData, avatar_url: url });
+    // Also save immediately
+    updateProfile({ avatar_url: url });
   };
 
   return (
@@ -115,13 +132,28 @@ export default function Profile() {
         </div>
 
         <div className="space-y-6">
-          {/* Basic Info */}
+          {/* Avatar Section */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <User className="w-5 h-5" />
-                Basic Information
+                Profile Photo
               </CardTitle>
+            </CardHeader>
+            <CardContent className="flex justify-center">
+              <AvatarUpload
+                userId={user.id}
+                currentAvatarUrl={formData.avatar_url}
+                fullName={formData.full_name}
+                onAvatarChange={handleAvatarChange}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Basic Info */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Basic Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
@@ -132,6 +164,7 @@ export default function Profile() {
                     value={formData.full_name}
                     onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                   />
+                  {errors.full_name && <p className="text-sm text-destructive">{errors.full_name}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone</Label>
@@ -156,7 +189,6 @@ export default function Profile() {
                     placeholder="City, Country"
                     className="pl-10"
                   />
-                  {errors.full_name && <p className="text-sm text-destructive">{errors.full_name}</p>}
                 </div>
               </div>
               
@@ -244,58 +276,43 @@ export default function Profile() {
 
           {/* Volunteer-specific fields */}
           {!isNGO && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Skills & Experience</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Skills</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={newSkill}
-                      onChange={(e) => setNewSkill(e.target.value)}
-                      placeholder="Add a skill..."
-                      onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addSkill())}
-                    />
-                    <Button type="button" onClick={addSkill} variant="secondary">
-                      <Plus className="w-4 h-4" />
-                    </Button>
-                  </div>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {formData.skills.map((skill, index) => (
-                      <Badge key={index} variant="skill" className="gap-1">
-                        {skill}
-                        <button onClick={() => removeSkill(skill)} className="ml-1 hover:text-destructive">
-                          <X className="w-3 h-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-                
-                <div className="grid md:grid-cols-2 gap-4">
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Skills</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <SkillsTagInput
+                    skills={formData.skills}
+                    onChange={(skills) => setFormData({ ...formData, skills })}
+                  />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Availability</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <AvailabilityPicker
+                    value={formData.availability}
+                    onChange={(availability) => setFormData({ ...formData, availability })}
+                  />
+                  
                   <div className="space-y-2">
                     <Label htmlFor="experience">Years of Experience</Label>
                     <Input
                       id="experience"
                       type="number"
                       value={formData.experience_years}
-                      onChange={(e) => setFormData({ ...formData, experience_years: parseInt(e.target.value) })}
+                      onChange={(e) => setFormData({ ...formData, experience_years: parseInt(e.target.value) || 0 })}
+                      min={0}
+                      max={50}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="availability">Availability</Label>
-                    <Input
-                      id="availability"
-                      value={formData.availability}
-                      onChange={(e) => setFormData({ ...formData, availability: e.target.value })}
-                      placeholder="e.g., Weekends, 10 hrs/week"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </>
           )}
 
           <div className="flex justify-end">
