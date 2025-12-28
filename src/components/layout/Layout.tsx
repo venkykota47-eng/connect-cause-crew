@@ -1,6 +1,7 @@
 import { Navbar } from "./Navbar";
 import { Footer } from "./Footer";
 import { ReactNode } from "react";
+import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
 
 interface LayoutProps {
   children: ReactNode;
@@ -8,6 +9,9 @@ interface LayoutProps {
 }
 
 export function Layout({ children, showFooter = true }: LayoutProps) {
+  // Enable realtime notifications for authenticated users
+  useRealtimeNotifications();
+  
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
