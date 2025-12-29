@@ -4,6 +4,23 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { MessageSquare, UserCheck, Bell } from "lucide-react";
 
+// Helper to send notification emails
+const sendNotificationEmail = async (
+  type: "new_application" | "application_status" | "new_message",
+  recipientEmail: string,
+  recipientName: string,
+  data: Record<string, string | undefined>
+) => {
+  try {
+    await supabase.functions.invoke("send-notification-email", {
+      body: { type, recipientEmail, recipientName, data },
+    });
+    console.log(`Email notification sent: ${type}`);
+  } catch (error) {
+    console.error("Failed to send email notification:", error);
+  }
+};
+
 export function useRealtimeNotifications() {
   const { profile } = useAuth();
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -35,7 +52,7 @@ export function useRealtimeNotifications() {
         // Fetch sender info
         const { data: sender } = await supabase
           .from("profiles")
-          .select("full_name")
+          .select("full_name, email")
           .eq("id", message.sender_id)
           .maybeSingle();
 
@@ -47,6 +64,14 @@ export function useRealtimeNotifications() {
             onClick: () => window.location.href = "/messages",
           },
         });
+
+        // Send email notification
+        if (profile.email) {
+          sendNotificationEmail("new_message", profile.email, profile.full_name, {
+            senderName: sender?.full_name || "Someone",
+            messagePreview: message.content.slice(0, 100),
+          });
+        }
       }
     );
 
@@ -88,6 +113,14 @@ export function useRealtimeNotifications() {
                 onClick: () => window.location.href = `/opportunities/${application.opportunity_id}/applications`,
               },
             });
+
+            // Send email notification to NGO
+            if (profile.email) {
+              sendNotificationEmail("new_application", profile.email, profile.full_name, {
+                opportunityTitle: opportunity.title,
+                applicantName: volunteer?.full_name || "A volunteer",
+              });
+            }
           }
         }
       );
@@ -134,6 +167,14 @@ export function useRealtimeNotifications() {
                 onClick: () => window.location.href = "/applications",
               },
             });
+
+            // Send email notification to volunteer
+            if (profile.email) {
+              sendNotificationEmail("application_status", profile.email, profile.full_name, {
+                opportunityTitle: opportunity?.title,
+                status: application.status,
+              });
+            }
           }
         }
       );
