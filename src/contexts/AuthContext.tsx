@@ -24,6 +24,9 @@ interface Profile {
   mission: string | null;
   founded_year: number | null;
   team_size: number | null;
+  email_new_messages: boolean;
+  email_new_applications: boolean;
+  email_application_updates: boolean;
 }
 
 interface AuthContextType {

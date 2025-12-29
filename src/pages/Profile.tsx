@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Layout } from "@/components/layout/Layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Navigate } from "react-router-dom";
-import { User, Building2, MapPin, Globe } from "lucide-react";
+import { User, Building2, MapPin, Globe, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { volunteerProfileSchema, ngoProfileSchema, validateForm } from "@/lib/validations";
 import { AvatarUpload } from "@/components/profile/AvatarUpload";
@@ -34,6 +35,9 @@ export default function Profile() {
     founded_year: new Date().getFullYear(),
     team_size: 0,
     avatar_url: null as string | null,
+    email_new_messages: true,
+    email_new_applications: true,
+    email_application_updates: true,
   });
 
   // Initialize form data when profile loads
@@ -53,6 +57,9 @@ export default function Profile() {
         founded_year: profile.founded_year || new Date().getFullYear(),
         team_size: profile.team_size || 0,
         avatar_url: profile.avatar_url || null,
+        email_new_messages: profile.email_new_messages ?? true,
+        email_new_applications: profile.email_new_applications ?? true,
+        email_application_updates: profile.email_application_updates ?? true,
       });
     }
   }, [profile]);
@@ -314,6 +321,70 @@ export default function Profile() {
               </Card>
             </>
           )}
+
+          {/* Email Preferences */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Mail className="w-5 h-5" />
+                Email Notifications
+              </CardTitle>
+              <CardDescription>
+                Choose which email notifications you'd like to receive
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="email-messages">New Messages</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Receive emails when someone sends you a message
+                  </p>
+                </div>
+                <Switch
+                  id="email-messages"
+                  checked={formData.email_new_messages}
+                  onCheckedChange={(checked) => 
+                    setFormData({ ...formData, email_new_messages: checked })
+                  }
+                />
+              </div>
+              
+              {isNGO ? (
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="email-applications">New Applications</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Receive emails when volunteers apply to your opportunities
+                    </p>
+                  </div>
+                  <Switch
+                    id="email-applications"
+                    checked={formData.email_new_applications}
+                    onCheckedChange={(checked) => 
+                      setFormData({ ...formData, email_new_applications: checked })
+                    }
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="email-status">Application Updates</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Receive emails when your application status changes
+                    </p>
+                  </div>
+                  <Switch
+                    id="email-status"
+                    checked={formData.email_application_updates}
+                    onCheckedChange={(checked) => 
+                      setFormData({ ...formData, email_application_updates: checked })
+                    }
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           <div className="flex justify-end">
             <Button onClick={handleSave} variant="hero" size="lg" disabled={saving}>

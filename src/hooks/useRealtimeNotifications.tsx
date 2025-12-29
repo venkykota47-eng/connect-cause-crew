@@ -65,8 +65,8 @@ export function useRealtimeNotifications() {
           },
         });
 
-        // Send email notification
-        if (profile.email) {
+        // Send email notification if preference enabled
+        if (profile.email && profile.email_new_messages) {
           sendNotificationEmail("new_message", profile.email, profile.full_name, {
             senderName: sender?.full_name || "Someone",
             messagePreview: message.content.slice(0, 100),
@@ -114,8 +114,8 @@ export function useRealtimeNotifications() {
               },
             });
 
-            // Send email notification to NGO
-            if (profile.email) {
+            // Send email notification to NGO if preference enabled
+            if (profile.email && profile.email_new_applications) {
               sendNotificationEmail("new_application", profile.email, profile.full_name, {
                 opportunityTitle: opportunity.title,
                 applicantName: volunteer?.full_name || "A volunteer",
@@ -168,8 +168,8 @@ export function useRealtimeNotifications() {
               },
             });
 
-            // Send email notification to volunteer
-            if (profile.email) {
+            // Send email notification to volunteer if preference enabled
+            if (profile.email && profile.email_application_updates) {
               sendNotificationEmail("application_status", profile.email, profile.full_name, {
                 opportunityTitle: opportunity?.title,
                 status: application.status,
@@ -193,5 +193,5 @@ export function useRealtimeNotifications() {
         supabase.removeChannel(channelRef.current);
       }
     };
-  }, [profile?.id, profile?.role]);
+  }, [profile?.id, profile?.role, profile?.email_new_messages, profile?.email_new_applications, profile?.email_application_updates]);
 }
