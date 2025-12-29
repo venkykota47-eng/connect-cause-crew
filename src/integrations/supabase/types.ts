@@ -211,6 +211,9 @@ export type Database = {
           bio: string | null
           created_at: string
           email: string
+          email_application_updates: boolean | null
+          email_new_applications: boolean | null
+          email_new_messages: boolean | null
           experience_years: number | null
           founded_year: number | null
           full_name: string
@@ -232,6 +235,9 @@ export type Database = {
           bio?: string | null
           created_at?: string
           email: string
+          email_application_updates?: boolean | null
+          email_new_applications?: boolean | null
+          email_new_messages?: boolean | null
           experience_years?: number | null
           founded_year?: number | null
           full_name: string
@@ -253,6 +259,9 @@ export type Database = {
           bio?: string | null
           created_at?: string
           email?: string
+          email_application_updates?: boolean | null
+          email_new_applications?: boolean | null
+          email_new_messages?: boolean | null
           experience_years?: number | null
           founded_year?: number | null
           full_name?: string
