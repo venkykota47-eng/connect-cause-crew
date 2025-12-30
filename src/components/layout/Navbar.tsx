@@ -11,11 +11,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useUnreadNotifications } from "@/hooks/useUnreadNotifications";
 
 export function Navbar() {
   const { user, profile, signOut } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const unreadCount = useUnreadNotifications();
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -71,6 +73,11 @@ export function Navbar() {
                 <Link to="/notifications">
                   <Button variant="ghost" size="icon" className="relative">
                     <Bell className="h-5 w-5" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </span>
+                    )}
                   </Button>
                 </Link>
 

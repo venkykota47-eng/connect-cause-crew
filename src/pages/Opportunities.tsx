@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -10,8 +10,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Navigate, Link } from "react-router-dom";
 import { 
   Search, MapPin, Clock, Calendar, Users, Briefcase, 
-  Filter, ChevronDown, Building2, Globe 
+  Filter, ChevronDown, Building2, Globe, Sparkles 
 } from "lucide-react";
+import { calculateSkillMatch, getMatchLevel } from "@/lib/skillMatching";
 import {
   Select,
   SelectContent,
@@ -103,26 +104,39 @@ export default function Opportunities() {
     }
   };
 
-  const filteredOpportunities = opportunities.filter((opp) => {
-    const matchesSearch =
-      opp.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      opp.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      opp.location.toLowerCase().includes(searchQuery.toLowerCase());
+  // Calculate skill match for each opportunity
+  const opportunitiesWithMatch = useMemo(() => {
+    return opportunities.map((opp) => ({
+      ...opp,
+      matchPercentage: calculateSkillMatch(profile?.skills, opp.skills_required),
+    }));
+  }, [opportunities, profile?.skills]);
 
-    const matchesCommitment =
-      commitmentFilter === "all" || opp.commitment_type === commitmentFilter;
+  const filteredOpportunities = useMemo(() => {
+    const filtered = opportunitiesWithMatch.filter((opp) => {
+      const matchesSearch =
+        opp.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        opp.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        opp.location.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesRemote =
-      remoteFilter === "all" ||
-      (remoteFilter === "remote" && opp.is_remote) ||
-      (remoteFilter === "onsite" && !opp.is_remote);
+      const matchesCommitment =
+        commitmentFilter === "all" || opp.commitment_type === commitmentFilter;
 
-    const matchesSkills =
-      selectedSkills.length === 0 ||
-      selectedSkills.some((skill) => opp.skills_required?.includes(skill));
+      const matchesRemote =
+        remoteFilter === "all" ||
+        (remoteFilter === "remote" && opp.is_remote) ||
+        (remoteFilter === "onsite" && !opp.is_remote);
 
-    return matchesSearch && matchesCommitment && matchesRemote && matchesSkills;
-  });
+      const matchesSkills =
+        selectedSkills.length === 0 ||
+        selectedSkills.some((skill) => opp.skills_required?.includes(skill));
+
+      return matchesSearch && matchesCommitment && matchesRemote && matchesSkills;
+    });
+
+    // Sort by match percentage (highest first)
+    return filtered.sort((a, b) => b.matchPercentage - a.matchPercentage);
+  }, [opportunitiesWithMatch, searchQuery, commitmentFilter, remoteFilter, selectedSkills]);
 
   if (loading) {
     return (
@@ -251,32 +265,42 @@ export default function Opportunities() {
           </Card>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredOpportunities.map((opportunity) => (
-              <Card key={opportunity.id} className="flex flex-col hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-primary-soft">
-                        <Building2 className="h-5 w-5 text-primary" />
+            {filteredOpportunities.map((opportunity) => {
+              const matchLevel = getMatchLevel(opportunity.matchPercentage);
+              return (
+                <Card key={opportunity.id} className="flex flex-col hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-primary-soft">
+                          <Building2 className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">
+                            {opportunity.profiles?.organization_name || "Organization"}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">
-                          {opportunity.profiles?.organization_name || "Organization"}
-                        </p>
+                      <div className="flex flex-col items-end gap-1">
+                        {profile?.skills && profile.skills.length > 0 && (
+                          <Badge variant={matchLevel.variant} className="gap-1">
+                            <Sparkles className="h-3 w-3" />
+                            {opportunity.matchPercentage}% Match
+                          </Badge>
+                        )}
+                        {opportunity.is_remote && (
+                          <Badge variant="outline" className="gap-1">
+                            <Globe className="h-3 w-3" />
+                            Remote
+                          </Badge>
+                        )}
                       </div>
                     </div>
-                    {opportunity.is_remote && (
-                      <Badge variant="outline" className="gap-1">
-                        <Globe className="h-3 w-3" />
-                        Remote
-                      </Badge>
-                    )}
-                  </div>
-                  <CardTitle className="mt-3">{opportunity.title}</CardTitle>
-                  <CardDescription className="line-clamp-2">
-                    {opportunity.description}
-                  </CardDescription>
-                </CardHeader>
+                    <CardTitle className="mt-3">{opportunity.title}</CardTitle>
+                    <CardDescription className="line-clamp-2">
+                      {opportunity.description}
+                    </CardDescription>
+                  </CardHeader>
                 <CardContent className="flex-1">
                   <div className="flex flex-wrap gap-2 mb-4">
                     {opportunity.skills_required?.slice(0, 3).map((skill, i) => (
@@ -305,17 +329,18 @@ export default function Opportunities() {
                     )}
                   </div>
                 </CardContent>
-                <CardFooter className="pt-4 border-t">
-                  <Button
-                    variant="hero"
-                    className="w-full"
-                    onClick={() => handleApply(opportunity.id)}
-                  >
-                    Apply Now
-                  </Button>
-                </CardFooter>
-              </Card>
-            ))}
+                  <CardFooter className="pt-4 border-t">
+                    <Button
+                      variant="hero"
+                      className="w-full"
+                      onClick={() => handleApply(opportunity.id)}
+                    >
+                      Apply Now
+                    </Button>
+                  </CardFooter>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
