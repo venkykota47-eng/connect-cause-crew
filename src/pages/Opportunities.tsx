@@ -40,6 +40,7 @@ export default function Opportunities() {
   const [commitmentFilter, setCommitmentFilter] = useState<string>("all");
   const [remoteFilter, setRemoteFilter] = useState<string>("all");
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [highMatchOnly, setHighMatchOnly] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const allSkills = [
@@ -131,12 +132,14 @@ export default function Opportunities() {
         selectedSkills.length === 0 ||
         selectedSkills.some((skill) => opp.skills_required?.includes(skill));
 
-      return matchesSearch && matchesCommitment && matchesRemote && matchesSkills;
+      const matchesHighMatch = !highMatchOnly || opp.matchPercentage >= 80;
+
+      return matchesSearch && matchesCommitment && matchesRemote && matchesSkills && matchesHighMatch;
     });
 
     // Sort by match percentage (highest first)
     return filtered.sort((a, b) => b.matchPercentage - a.matchPercentage);
-  }, [opportunitiesWithMatch, searchQuery, commitmentFilter, remoteFilter, selectedSkills]);
+  }, [opportunitiesWithMatch, searchQuery, commitmentFilter, remoteFilter, selectedSkills, highMatchOnly]);
 
   if (loading) {
     return (
@@ -229,6 +232,22 @@ export default function Opportunities() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {profile?.skills && profile.skills.length > 0 && (
+            <Button
+              variant={highMatchOnly ? "default" : "outline"}
+              className="gap-2"
+              onClick={() => setHighMatchOnly(!highMatchOnly)}
+            >
+              <Sparkles className="h-4 w-4" />
+              Best Matches
+              {highMatchOnly && (
+                <Badge variant="secondary" className="ml-1 bg-primary-foreground/20 text-primary-foreground">
+                  80%+
+                </Badge>
+              )}
+            </Button>
+          )}
         </div>
 
         {/* Results Count */}
