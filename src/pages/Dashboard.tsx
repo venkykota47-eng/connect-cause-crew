@@ -11,6 +11,8 @@ import {
   ArrowRight, Bell, CheckCircle, Clock, Calendar, Sparkles, User
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { BestMatchesWidget } from "@/components/dashboard/BestMatchesWidget";
+import { SkillGapAnalysis } from "@/components/dashboard/SkillGapAnalysis";
 
 interface DashboardStats {
   opportunities: number;
@@ -390,6 +392,11 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
+            {/* Best Matches Widget for Volunteers */}
+            {!isNGO && (
+              <BestMatchesWidget userSkills={profile.skills} />
+            )}
+
             {/* Skills Section for Volunteers */}
             {!isNGO && (
               <Card>
@@ -424,6 +431,11 @@ export default function Dashboard() {
 
           {/* Sidebar - Activity Feed */}
           <div className="space-y-6">
+            {/* Skill Gap Analysis for Volunteers */}
+            {!isNGO && (
+              <SkillGapAnalysis userSkills={profile.skills} />
+            )}
+
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
