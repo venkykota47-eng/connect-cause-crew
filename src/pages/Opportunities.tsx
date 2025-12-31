@@ -5,12 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Navigate, Link } from "react-router-dom";
 import { 
   Search, MapPin, Clock, Calendar, Users, Briefcase, 
-  Filter, ChevronDown, Building2, Globe, Sparkles 
+  Filter, ChevronDown, Building2, Globe, Sparkles, GitCompare 
 } from "lucide-react";
 import { calculateSkillMatch, getMatchLevel } from "@/lib/skillMatching";
 import {
@@ -26,6 +27,7 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { OpportunityComparison } from "@/components/opportunities/OpportunityComparison";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Opportunity = Tables<"opportunities"> & {
@@ -42,6 +44,8 @@ export default function Opportunities() {
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [highMatchOnly, setHighMatchOnly] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedForComparison, setSelectedForComparison] = useState<string[]>([]);
+  const [comparisonOpen, setComparisonOpen] = useState(false);
 
   const allSkills = [
     "Web Development", "Mobile Development", "Data Analysis", "Marketing",
@@ -140,6 +144,27 @@ export default function Opportunities() {
     // Sort by match percentage (highest first)
     return filtered.sort((a, b) => b.matchPercentage - a.matchPercentage);
   }, [opportunitiesWithMatch, searchQuery, commitmentFilter, remoteFilter, selectedSkills, highMatchOnly]);
+
+  const toggleComparisonSelection = (id: string) => {
+    setSelectedForComparison((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((oppId) => oppId !== id);
+      }
+      if (prev.length >= 4) {
+        toast({
+          title: "Maximum reached",
+          description: "You can compare up to 4 opportunities at a time",
+          variant: "destructive",
+        });
+        return prev;
+      }
+      return [...prev, id];
+    });
+  };
+
+  const comparisonOpportunities = useMemo(() => {
+    return opportunitiesWithMatch.filter((opp) => selectedForComparison.includes(opp.id));
+  }, [opportunitiesWithMatch, selectedForComparison]);
 
   if (loading) {
     return (
@@ -250,11 +275,21 @@ export default function Opportunities() {
           )}
         </div>
 
-        {/* Results Count */}
-        <div className="mb-4">
+        {/* Results Count and Compare Button */}
+        <div className="flex items-center justify-between mb-4">
           <p className="text-sm text-muted-foreground">
             Showing {filteredOpportunities.length} opportunities
           </p>
+          {selectedForComparison.length >= 2 && (
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => setComparisonOpen(true)}
+            >
+              <GitCompare className="h-4 w-4" />
+              Compare ({selectedForComparison.length})
+            </Button>
+          )}
         </div>
 
         {/* Opportunities Grid */}
@@ -286,13 +321,26 @@ export default function Opportunities() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredOpportunities.map((opportunity) => {
               const matchLevel = getMatchLevel(opportunity.matchPercentage);
+              const isSelected = selectedForComparison.includes(opportunity.id);
               return (
-                <Card key={opportunity.id} className="flex flex-col hover:shadow-lg transition-shadow">
+                <Card 
+                  key={opportunity.id} 
+                  className={`flex flex-col hover:shadow-lg transition-all ${
+                    isSelected ? "ring-2 ring-primary" : ""
+                  }`}
+                >
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-primary-soft">
-                          <Building2 className="h-5 w-5 text-primary" />
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleComparisonSelection(opportunity.id)}
+                            aria-label={`Select ${opportunity.title} for comparison`}
+                          />
+                          <div className="p-2 rounded-lg bg-primary-soft">
+                            <Building2 className="h-5 w-5 text-primary" />
+                          </div>
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">
@@ -362,6 +410,15 @@ export default function Opportunities() {
             })}
           </div>
         )}
+
+        {/* Comparison Modal */}
+        <OpportunityComparison
+          opportunities={comparisonOpportunities}
+          open={comparisonOpen}
+          onOpenChange={setComparisonOpen}
+          onRemove={(id) => setSelectedForComparison((prev) => prev.filter((oppId) => oppId !== id))}
+          userHasSkills={!!profile?.skills && profile.skills.length > 0}
+        />
       </div>
     </Layout>
   );
