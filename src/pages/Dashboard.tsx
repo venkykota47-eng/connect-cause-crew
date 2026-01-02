@@ -14,6 +14,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { BestMatchesWidget } from "@/components/dashboard/BestMatchesWidget";
 import { SkillGapAnalysis } from "@/components/dashboard/SkillGapAnalysis";
 import { SmartRecommendations } from "@/components/dashboard/SmartRecommendations";
+import { TrendingSkills } from "@/components/dashboard/TrendingSkills";
+import { useSmartMatchNotifications } from "@/hooks/useSmartMatchNotifications";
 
 interface DashboardStats {
   opportunities: number;
@@ -40,6 +42,13 @@ export default function Dashboard() {
   });
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [loadingStats, setLoadingStats] = useState(true);
+
+  // Enable smart match notifications for volunteers
+  useSmartMatchNotifications({
+    profileId: profile?.id,
+    userSkills: profile?.skills,
+    enabled: profile?.role === "volunteer",
+  });
 
   useEffect(() => {
     if (profile) {
@@ -437,6 +446,9 @@ export default function Dashboard() {
 
           {/* Sidebar - Activity Feed */}
           <div className="space-y-6">
+            {/* Trending Skills */}
+            <TrendingSkills userSkills={profile.skills} />
+
             {/* Skill Gap Analysis for Volunteers */}
             {!isNGO && (
               <SkillGapAnalysis userSkills={profile.skills} />
