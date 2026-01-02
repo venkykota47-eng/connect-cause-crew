@@ -6,12 +6,16 @@ import { toast } from "sonner";
 interface UseSmartMatchNotificationsProps {
   profileId: string | undefined;
   userSkills: string[] | null | undefined;
+  userEmail: string | undefined;
+  userName: string | undefined;
   enabled: boolean;
 }
 
 export function useSmartMatchNotifications({
   profileId,
   userSkills,
+  userEmail,
+  userName,
   enabled,
 }: UseSmartMatchNotificationsProps) {
   const processedOpportunities = useRef<Set<string>>(new Set());
@@ -77,6 +81,27 @@ export function useSmartMatchNotifications({
               message: `"${newOpportunity.title}" by ${orgName} is a ${matchPercentage}% match for your skills.`,
               related_id: newOpportunity.id,
             });
+
+            // Send email notification if user has email
+            if (userEmail && userName) {
+              try {
+                await supabase.functions.invoke("send-notification-email", {
+                  body: {
+                    type: "smart_match",
+                    recipientEmail: userEmail,
+                    recipientName: userName,
+                    data: {
+                      opportunityTitle: newOpportunity.title,
+                      organizationName: orgName,
+                      matchPercentage,
+                    },
+                  },
+                });
+                console.log("Smart match email sent successfully");
+              } catch (error) {
+                console.error("Failed to send smart match email:", error);
+              }
+            }
           }
         }
       )
@@ -85,5 +110,5 @@ export function useSmartMatchNotifications({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [enabled, profileId, userSkills]);
+  }, [enabled, profileId, userSkills, userEmail, userName]);
 }

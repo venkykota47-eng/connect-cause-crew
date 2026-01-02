@@ -10,7 +10,7 @@ const corsHeaders = {
 };
 
 interface NotificationEmailRequest {
-  type: "new_application" | "application_status" | "new_message";
+  type: "new_application" | "application_status" | "new_message" | "smart_match";
   recipientEmail: string;
   recipientName: string;
   data: {
@@ -19,6 +19,8 @@ interface NotificationEmailRequest {
     status?: string;
     senderName?: string;
     messagePreview?: string;
+    organizationName?: string;
+    matchPercentage?: number;
   };
 }
 
@@ -74,6 +76,28 @@ const getEmailContent = (type: string, recipientName: string, data: any) => {
             <p>Log in to SkillBridge to reply.</p>
             <div style="margin-top: 24px; padding: 16px; background-color: #f3f4f6; border-radius: 8px;">
               <p style="margin: 0; color: #6b7280; font-size: 14px;">This is an automated notification from SkillBridge.</p>
+            </div>
+          </div>
+        `,
+      };
+    case "smart_match":
+      return {
+        subject: `🎯 New Opportunity Match: ${data.matchPercentage}% Match!`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #2563eb;">Perfect Opportunity Match Found!</h1>
+            <p>Hello ${recipientName},</p>
+            <p>Great news! We found a new volunteer opportunity that matches <strong>${data.matchPercentage}%</strong> of your skills.</p>
+            <div style="margin: 24px 0; padding: 20px; background-color: #ecfdf5; border-left: 4px solid #16a34a; border-radius: 4px;">
+              <h2 style="margin: 0 0 8px 0; color: #166534; font-size: 18px;">${data.opportunityTitle}</h2>
+              <p style="margin: 0; color: #15803d;">by ${data.organizationName}</p>
+              <div style="margin-top: 12px; display: inline-block; background-color: #16a34a; color: white; padding: 4px 12px; border-radius: 16px; font-weight: bold;">
+                ${data.matchPercentage}% Match
+              </div>
+            </div>
+            <p>Don't miss out on this great opportunity! Log in to SkillBridge to apply now.</p>
+            <div style="margin-top: 24px; padding: 16px; background-color: #f3f4f6; border-radius: 8px;">
+              <p style="margin: 0; color: #6b7280; font-size: 14px;">This is an automated notification from SkillBridge based on your skill profile.</p>
             </div>
           </div>
         `,

@@ -47,6 +47,8 @@ export default function Dashboard() {
   useSmartMatchNotifications({
     profileId: profile?.id,
     userSkills: profile?.skills,
+    userEmail: profile?.email,
+    userName: profile?.full_name,
     enabled: profile?.role === "volunteer",
   });
 
