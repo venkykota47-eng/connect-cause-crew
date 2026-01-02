@@ -13,6 +13,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { BestMatchesWidget } from "@/components/dashboard/BestMatchesWidget";
 import { SkillGapAnalysis } from "@/components/dashboard/SkillGapAnalysis";
+import { SmartRecommendations } from "@/components/dashboard/SmartRecommendations";
 
 interface DashboardStats {
   opportunities: number;
@@ -391,6 +392,11 @@ export default function Dashboard() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Smart Recommendations for Volunteers */}
+            {!isNGO && (
+              <SmartRecommendations userSkills={profile.skills} profileId={profile.id} />
+            )}
 
             {/* Best Matches Widget for Volunteers */}
             {!isNGO && (
