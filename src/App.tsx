@@ -15,6 +15,7 @@ import Notifications from "./pages/Notifications";
 import CreateOpportunity from "./pages/CreateOpportunity";
 import ManageOpportunities from "./pages/ManageOpportunities";
 import OpportunityApplications from "./pages/OpportunityApplications";
+import ResumeScanner from "./pages/ResumeScanner";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const App = () => (
             <Route path="/applications" element={<Applications />} />
             <Route path="/messages" element={<Messages />} />
             <Route path="/notifications" element={<Notifications />} />
+            <Route path="/resume-scanner" element={<ResumeScanner />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

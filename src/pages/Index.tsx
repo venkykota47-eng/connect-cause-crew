@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Layout } from "@/components/layout/Layout";
-import { ArrowRight, Users, Building2, Sparkles, Heart, Globe, Award } from "lucide-react";
+import { ArrowRight, Users, Building2, Sparkles, Heart, Globe, Award, FileText, Target, TrendingUp } from "lucide-react";
 
 const Index = () => {
   return (
@@ -105,6 +105,100 @@ const Index = () => {
               <p className="text-muted-foreground">
                 Connect directly with NGOs, apply to opportunities, and start making a real difference in your community.
               </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Resume Scanner Section */}
+      <section className="py-24">
+        <div className="container mx-auto px-4">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <div>
+              <Badge variant="skill" className="mb-4 px-4 py-1.5">
+                <FileText className="w-4 h-4 mr-1" />
+                AI-Powered Tool
+              </Badge>
+              <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">
+                Resume Scanner & <span className="gradient-text">ATS Score Checker</span>
+              </h2>
+              <p className="text-muted-foreground mb-6">
+                Get your resume analyzed instantly with our AI-powered scanner. Check ATS compatibility, 
+                identify missing keywords, and receive actionable suggestions to improve your chances.
+              </p>
+              
+              <div className="space-y-4 mb-8">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
+                    <Target className="w-5 h-5 text-primary-foreground" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold">ATS Compatibility Score</h4>
+                    <p className="text-sm text-muted-foreground">See how well your resume performs with Applicant Tracking Systems</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg gradient-secondary flex items-center justify-center flex-shrink-0">
+                    <TrendingUp className="w-5 h-5 text-secondary-foreground" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold">Keyword Analysis</h4>
+                    <p className="text-sm text-muted-foreground">Identify important keywords you're missing and those you have</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center flex-shrink-0">
+                    <Sparkles className="w-5 h-5 text-primary-foreground" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold">Edit & Download</h4>
+                    <p className="text-sm text-muted-foreground">Make improvements directly and download your optimized resume</p>
+                  </div>
+                </div>
+              </div>
+
+              <Link to="/resume-scanner">
+                <Button variant="hero" size="lg" className="gap-2">
+                  Scan Your Resume
+                  <ArrowRight className="w-5 h-5" />
+                </Button>
+              </Link>
+            </div>
+
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-secondary/20 rounded-3xl blur-2xl" />
+              <div className="relative bg-card rounded-2xl p-8 shadow-xl border">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
+                    <FileText className="w-6 h-6 text-primary-foreground" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold">Resume Analysis</h3>
+                    <p className="text-sm text-muted-foreground">Instant ATS Check</p>
+                  </div>
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">ATS Score</span>
+                    <span className="text-2xl font-bold text-green-500">85%</span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2">
+                    <div className="bg-green-500 h-2 rounded-full" style={{ width: "85%" }} />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4 pt-4">
+                    <div className="text-center p-3 bg-muted/50 rounded-lg">
+                      <p className="text-2xl font-bold text-primary">12</p>
+                      <p className="text-xs text-muted-foreground">Keywords Found</p>
+                    </div>
+                    <div className="text-center p-3 bg-muted/50 rounded-lg">
+                      <p className="text-2xl font-bold text-secondary">5</p>
+                      <p className="text-xs text-muted-foreground">Sections OK</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
