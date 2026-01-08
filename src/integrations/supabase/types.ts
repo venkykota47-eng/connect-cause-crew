@@ -101,6 +101,141 @@ export type Database = {
           },
         ]
       }
+      mock_interview_feedback: {
+        Row: {
+          communication_score: number | null
+          confidence_score: number | null
+          created_at: string
+          final_verdict: string | null
+          id: string
+          improvement_advice: string | null
+          improvements: string[] | null
+          problem_solving_score: number | null
+          session_id: string
+          strengths: string[] | null
+          technical_score: number | null
+        }
+        Insert: {
+          communication_score?: number | null
+          confidence_score?: number | null
+          created_at?: string
+          final_verdict?: string | null
+          id?: string
+          improvement_advice?: string | null
+          improvements?: string[] | null
+          problem_solving_score?: number | null
+          session_id: string
+          strengths?: string[] | null
+          technical_score?: number | null
+        }
+        Update: {
+          communication_score?: number | null
+          confidence_score?: number | null
+          created_at?: string
+          final_verdict?: string | null
+          id?: string
+          improvement_advice?: string | null
+          improvements?: string[] | null
+          problem_solving_score?: number | null
+          session_id?: string
+          strengths?: string[] | null
+          technical_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mock_interview_feedback_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: true
+            referencedRelation: "mock_interview_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mock_interview_messages: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          sender: string
+          session_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          sender: string
+          session_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          sender?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mock_interview_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "mock_interview_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mock_interview_sessions: {
+        Row: {
+          company: string | null
+          created_at: string
+          difficulty: string
+          ended_at: string | null
+          id: string
+          interview_type: string
+          job_role: string
+          overall_score: number | null
+          started_at: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string
+          difficulty?: string
+          ended_at?: string | null
+          id?: string
+          interview_type?: string
+          job_role: string
+          overall_score?: number | null
+          started_at?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company?: string | null
+          created_at?: string
+          difficulty?: string
+          ended_at?: string | null
+          id?: string
+          interview_type?: string
+          job_role?: string
+          overall_score?: number | null
+          started_at?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mock_interview_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string

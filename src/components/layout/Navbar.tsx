@@ -1,7 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { Menu, X, Bell, MessageSquare, User, LogOut, Home, Search, Briefcase, PlusCircle, FileText } from "lucide-react";
+import { Menu, X, Bell, MessageSquare, User, LogOut, Home, Search, Briefcase, PlusCircle, FileText, Bot } from "lucide-react";
 import { useState } from "react";
 import {
   DropdownMenu,
@@ -34,9 +34,13 @@ export function Navbar() {
           { path: "/opportunities", label: "Browse Opportunities", icon: Search },
           { path: "/applications", label: "My Applications", icon: Briefcase },
           { path: "/resume-scanner", label: "Resume Scanner", icon: FileText },
+          { path: "/mock-interview", label: "Mock Interview", icon: Bot },
           { path: "/messages", label: "Messages", icon: MessageSquare },
         ]
-    : [{ path: "/resume-scanner", label: "Resume Scanner", icon: FileText }];
+    : [
+        { path: "/resume-scanner", label: "Resume Scanner", icon: FileText },
+        { path: "/mock-interview", label: "Mock Interview", icon: Bot },
+      ];
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-card/80 backdrop-blur-xl">
