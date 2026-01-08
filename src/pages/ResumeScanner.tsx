@@ -37,11 +37,14 @@ import {
   Eye,
   Languages,
 } from "lucide-react";
-import * as pdfjsLib from "pdfjs-dist";
 import Tesseract from "tesseract.js";
 
-// Set PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Dynamically import pdfjs-dist to avoid top-level await issues
+const loadPdfJs = async () => {
+  const pdfjsLib = await import("pdfjs-dist");
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+  return pdfjsLib;
+};
 
 type ExperienceLevel = "fresher" | "experienced";
 type FileType = "text" | "pdf" | "image";
@@ -156,6 +159,7 @@ const ResumeScanner = () => {
   // Enhanced text extraction from PDF
   const extractTextFromPDF = async (file: File): Promise<string> => {
     try {
+      const pdfjsLib = await loadPdfJs();
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       let fullText = "";
