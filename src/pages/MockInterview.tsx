@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,8 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useVoiceInterview } from "@/hooks/useVoiceInterview";
 import { supabase } from "@/integrations/supabase/client";
 import {
   MessageCircle,
@@ -30,10 +32,16 @@ import {
   FileText,
   History,
   Star,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
+  Heart,
+  BookOpen,
 } from "lucide-react";
 
 type Difficulty = "EASY" | "MEDIUM" | "HARD";
-type InterviewType = "TECHNICAL" | "HR" | "BEHAVIORAL" | "MIXED";
+type InterviewType = "TECHNICAL" | "HR" | "BEHAVIORAL" | "MIXED" | "ENGLISH_COMMUNICATION" | "CONFIDENCE_BUILDING";
 type SessionStatus = "idle" | "configuring" | "in_progress" | "generating_feedback" | "completed";
 
 interface Message {
@@ -76,6 +84,7 @@ const MockInterview = () => {
   const [company, setCompany] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>("MEDIUM");
   const [interviewType, setInterviewType] = useState<InterviewType>("TECHNICAL");
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
   
   // Session state
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("idle");
@@ -88,6 +97,36 @@ const MockInterview = () => {
   // History state
   const [pastSessions, setPastSessions] = useState<InterviewSession[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+
+  // Voice interview hook
+  const {
+    isListening,
+    isSpeaking,
+    transcript,
+    startListening,
+    stopListening,
+    speak,
+    stopSpeaking,
+    isSupported: voiceSupported,
+    error: voiceError,
+  } = useVoiceInterview({
+    onTranscript: (text) => {
+      if (voiceEnabled && sessionStatus === "in_progress") {
+        setInputMessage(text);
+      }
+    },
+  });
+
+  // Show voice error
+  useEffect(() => {
+    if (voiceError) {
+      toast({
+        title: "Voice Error",
+        description: voiceError,
+        variant: "destructive",
+      });
+    }
+  }, [voiceError, toast]);
 
   useEffect(() => {
     if (profile?.id) {
@@ -191,9 +230,16 @@ const MockInterview = () => {
         message: data.message,
       });
 
+      // Speak AI message if voice is enabled
+      if (voiceEnabled && voiceSupported) {
+        speak(data.message);
+      }
+
       toast({
-        title: "Interview Started",
-        description: "Good luck! Answer the interviewer's questions.",
+        title: voiceEnabled ? "Voice Interview Started" : "Interview Started",
+        description: voiceEnabled 
+          ? "Listen to the question and click the microphone to answer."
+          : "Good luck! Answer the interviewer's questions.",
       });
 
     } catch (error) {
@@ -212,10 +258,11 @@ const MockInterview = () => {
   const sendMessage = async () => {
     if (!inputMessage.trim() || isLoading || !sessionId) return;
 
+    const messageText = inputMessage;
     const userMessage: Message = {
       id: crypto.randomUUID(),
       sender: "STUDENT",
-      content: inputMessage,
+      content: messageText,
       timestamp: new Date(),
     };
 
@@ -228,11 +275,11 @@ const MockInterview = () => {
       await supabase.from("mock_interview_messages").insert({
         session_id: sessionId,
         sender: "STUDENT",
-        message: inputMessage,
+        message: messageText,
       });
 
       // Check if user wants to end the interview
-      const lowerInput = inputMessage.toLowerCase();
+      const lowerInput = messageText.toLowerCase();
       const wantsToEnd = lowerInput.includes("end interview") || 
                          lowerInput.includes("stop interview") ||
                          lowerInput.includes("finish interview") ||
@@ -278,6 +325,11 @@ const MockInterview = () => {
         message: data.message,
       });
 
+      // Speak AI message if voice is enabled
+      if (voiceEnabled && voiceSupported) {
+        speak(data.message);
+      }
+
       // Check if interview is completed
       if (data.message.includes("INTERVIEW_COMPLETED") || wantsToEnd) {
         await endInterview([...messages, userMessage, aiMessage]);
@@ -293,6 +345,18 @@ const MockInterview = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleVoiceToggle = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  };
+
+  const handleStopSpeaking = () => {
+    stopSpeaking();
   };
 
   const endInterview = async (conversationMessages?: Message[]) => {
@@ -534,14 +598,101 @@ ${messages.map((m) => `${m.sender === "AI" ? "Interviewer" : "Candidate"}: ${m.c
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="TECHNICAL">Technical</SelectItem>
-                          <SelectItem value="HR">HR / Cultural Fit</SelectItem>
-                          <SelectItem value="BEHAVIORAL">Behavioral</SelectItem>
-                          <SelectItem value="MIXED">Mixed</SelectItem>
+                          <SelectItem value="TECHNICAL">
+                            <span className="flex items-center gap-2">
+                              <FileText className="h-4 w-4" />
+                              Technical
+                            </span>
+                          </SelectItem>
+                          <SelectItem value="HR">
+                            <span className="flex items-center gap-2">
+                              <User className="h-4 w-4" />
+                              HR / Cultural Fit
+                            </span>
+                          </SelectItem>
+                          <SelectItem value="BEHAVIORAL">
+                            <span className="flex items-center gap-2">
+                              <Target className="h-4 w-4" />
+                              Behavioral
+                            </span>
+                          </SelectItem>
+                          <SelectItem value="MIXED">
+                            <span className="flex items-center gap-2">
+                              <Briefcase className="h-4 w-4" />
+                              Mixed
+                            </span>
+                          </SelectItem>
+                          <SelectItem value="ENGLISH_COMMUNICATION">
+                            <span className="flex items-center gap-2">
+                              <BookOpen className="h-4 w-4" />
+                              English Communication
+                            </span>
+                          </SelectItem>
+                          <SelectItem value="CONFIDENCE_BUILDING">
+                            <span className="flex items-center gap-2">
+                              <Heart className="h-4 w-4" />
+                              Confidence Building
+                            </span>
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
+
+                  {/* Voice Mode Toggle */}
+                  <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/50">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <Mic className="h-4 w-4 text-primary" />
+                        <Label htmlFor="voice-mode" className="font-medium">Voice Interview Mode</Label>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {voiceSupported 
+                          ? "Speak your answers and hear AI questions aloud"
+                          : "Voice features not supported in this browser"}
+                      </p>
+                    </div>
+                    <Switch
+                      id="voice-mode"
+                      checked={voiceEnabled}
+                      onCheckedChange={setVoiceEnabled}
+                      disabled={!voiceSupported}
+                    />
+                  </div>
+
+                  {/* Interview Type Description */}
+                  {(interviewType === "ENGLISH_COMMUNICATION" || interviewType === "CONFIDENCE_BUILDING") && (
+                    <div className={`p-4 rounded-lg border ${
+                      interviewType === "CONFIDENCE_BUILDING" 
+                        ? "bg-pink-50 border-pink-200 dark:bg-pink-950/20 dark:border-pink-800" 
+                        : "bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800"
+                    }`}>
+                      <div className="flex items-start gap-3">
+                        {interviewType === "CONFIDENCE_BUILDING" ? (
+                          <Heart className="h-5 w-5 text-pink-600 mt-0.5" />
+                        ) : (
+                          <BookOpen className="h-5 w-5 text-blue-600 mt-0.5" />
+                        )}
+                        <div>
+                          <h4 className="font-medium text-sm">
+                            {interviewType === "CONFIDENCE_BUILDING" 
+                              ? "Confidence Building Mode"
+                              : "English Communication Practice"}
+                          </h4>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {interviewType === "CONFIDENCE_BUILDING"
+                              ? "The AI will be encouraging and supportive, helping reduce interview anxiety with simple questions that gradually increase in difficulty."
+                              : "Focus on improving your spoken English fluency. The AI will gently correct grammar and suggest better phrasing while keeping you motivated."}
+                          </p>
+                          {!voiceEnabled && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                              💡 Tip: Enable Voice Mode for the best experience!
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <Button 
                     onClick={startInterview} 
@@ -556,8 +707,8 @@ ${messages.map((m) => `${m.sender === "AI" ? "Interviewer" : "Candidate"}: ${m.c
                       </>
                     ) : (
                       <>
-                        <Play className="h-4 w-4 mr-2" />
-                        Start Mock Interview
+                        {voiceEnabled ? <Mic className="h-4 w-4 mr-2" /> : <Play className="h-4 w-4 mr-2" />}
+                        Start {voiceEnabled ? "Voice " : ""}Mock Interview
                       </>
                     )}
                   </Button>
@@ -649,10 +800,63 @@ ${messages.map((m) => `${m.sender === "AI" ? "Interviewer" : "Candidate"}: ${m.c
                         </div>
                       </div>
                     ) : (
-                      <div className="p-4 border-t">
+                      <div className="p-4 border-t space-y-3">
+                        {/* Voice Controls */}
+                        {voiceEnabled && (
+                          <div className="flex items-center justify-center gap-4 pb-3 border-b">
+                            {isSpeaking && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleStopSpeaking}
+                                className="gap-2"
+                              >
+                                <VolumeX className="h-4 w-4" />
+                                Stop Speaking
+                              </Button>
+                            )}
+                            <Button
+                              variant={isListening ? "destructive" : "default"}
+                              size="lg"
+                              onClick={handleVoiceToggle}
+                              disabled={isLoading || isSpeaking}
+                              className="gap-2 min-w-[160px]"
+                            >
+                              {isListening ? (
+                                <>
+                                  <MicOff className="h-5 w-5" />
+                                  Stop Recording
+                                </>
+                              ) : (
+                                <>
+                                  <Mic className="h-5 w-5" />
+                                  Start Recording
+                                </>
+                              )}
+                            </Button>
+                            {isListening && (
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <span className="relative flex h-3 w-3">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                                </span>
+                                Listening...
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Live Transcript */}
+                        {voiceEnabled && transcript && (
+                          <div className="p-2 bg-muted/50 rounded text-sm text-muted-foreground italic">
+                            "{transcript}"
+                          </div>
+                        )}
+
+                        {/* Text Input */}
                         <div className="flex gap-2">
                           <Input
-                            placeholder="Type your answer..."
+                            placeholder={voiceEnabled ? "Or type your answer..." : "Type your answer..."}
                             value={inputMessage}
                             onChange={(e) => setInputMessage(e.target.value)}
                             onKeyPress={(e) => e.key === "Enter" && sendMessage()}
@@ -662,8 +866,10 @@ ${messages.map((m) => `${m.sender === "AI" ? "Interviewer" : "Candidate"}: ${m.c
                             <Send className="h-4 w-4" />
                           </Button>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Tip: Say "end interview" when you're ready to finish and get feedback.
+                        <p className="text-xs text-muted-foreground">
+                          {voiceEnabled 
+                            ? "Tip: Click 'Start Recording' to speak, or type below. Say 'end interview' when done."
+                            : "Tip: Say 'end interview' when you're ready to finish and get feedback."}
                         </p>
                       </div>
                     )}
