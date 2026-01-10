@@ -106,7 +106,11 @@ export type Database = {
           communication_score: number | null
           confidence_score: number | null
           created_at: string
+          fear_reduction_score: number | null
           final_verdict: string | null
+          fluency_score: number | null
+          grammar_score: number | null
+          hesitation_count: number | null
           id: string
           improvement_advice: string | null
           improvements: string[] | null
@@ -114,12 +118,18 @@ export type Database = {
           session_id: string
           strengths: string[] | null
           technical_score: number | null
+          voice_clarity_score: number | null
+          words_per_minute: number | null
         }
         Insert: {
           communication_score?: number | null
           confidence_score?: number | null
           created_at?: string
+          fear_reduction_score?: number | null
           final_verdict?: string | null
+          fluency_score?: number | null
+          grammar_score?: number | null
+          hesitation_count?: number | null
           id?: string
           improvement_advice?: string | null
           improvements?: string[] | null
@@ -127,12 +137,18 @@ export type Database = {
           session_id: string
           strengths?: string[] | null
           technical_score?: number | null
+          voice_clarity_score?: number | null
+          words_per_minute?: number | null
         }
         Update: {
           communication_score?: number | null
           confidence_score?: number | null
           created_at?: string
+          fear_reduction_score?: number | null
           final_verdict?: string | null
+          fluency_score?: number | null
+          grammar_score?: number | null
+          hesitation_count?: number | null
           id?: string
           improvement_advice?: string | null
           improvements?: string[] | null
@@ -140,6 +156,8 @@ export type Database = {
           session_id?: string
           strengths?: string[] | null
           technical_score?: number | null
+          voice_clarity_score?: number | null
+          words_per_minute?: number | null
         }
         Relationships: [
           {
@@ -197,6 +215,7 @@ export type Database = {
           status: string
           updated_at: string
           user_id: string
+          voice_enabled: boolean | null
         }
         Insert: {
           company?: string | null
@@ -211,6 +230,7 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id: string
+          voice_enabled?: boolean | null
         }
         Update: {
           company?: string | null
@@ -225,6 +245,7 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id?: string
+          voice_enabled?: boolean | null
         }
         Relationships: [
           {
