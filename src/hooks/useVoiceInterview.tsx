@@ -55,6 +55,7 @@ declare global {
 interface UseVoiceInterviewOptions {
   onTranscript?: (text: string) => void;
   onSpeechEnd?: () => void;
+  onInterimTranscript?: (text: string) => void;
   language?: string;
 }
 

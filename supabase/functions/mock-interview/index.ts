@@ -13,6 +13,13 @@ interface InterviewRequest {
   company?: string;
   difficulty: string;
   interviewType: string;
+  voiceEnabled?: boolean;
+  voiceMetrics?: {
+    hesitationCount: number;
+    wordsPerMinute: number;
+    totalWords: number;
+    durationMinutes: number;
+  };
 }
 
 serve(async (req) => {
@@ -21,7 +28,7 @@ serve(async (req) => {
   }
 
   try {
-    const { type, messages, conversation, jobRole, company, difficulty, interviewType }: InterviewRequest = await req.json();
+    const { type, messages, conversation, jobRole, company, difficulty, interviewType, voiceEnabled, voiceMetrics }: InterviewRequest = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
     if (!LOVABLE_API_KEY) {
@@ -33,21 +40,48 @@ serve(async (req) => {
 
     if (type === "feedback") {
       // Generate feedback from the conversation
-      systemPrompt = `You are a placement evaluation expert.
+      const voiceMetricsInfo = voiceEnabled && voiceMetrics 
+        ? `\n\nVoice Interview Metrics:
+- Hesitations detected: ${voiceMetrics.hesitationCount}
+- Speaking speed: ${voiceMetrics.wordsPerMinute} words per minute
+- Total words spoken: ${voiceMetrics.totalWords}
+- Interview duration: ${voiceMetrics.durationMinutes.toFixed(1)} minutes`
+        : "";
+
+      const voiceFeedbackSchema = voiceEnabled 
+        ? `,
+  "voiceFeedback": {
+    "fluencyScore": number (1-10, how smoothly they speak),
+    "grammarScore": number (1-10, grammatical correctness),
+    "fearReductionScore": number (1-10, confidence improvement observed),
+    "hesitationCount": number (filler words like um, uh, like detected),
+    "wordsPerMinute": number (speaking pace),
+    "voiceClarityScore": number (1-10, how clear and articulate)
+  }`
+        : "";
+
+      systemPrompt = `You are a placement evaluation expert specializing in interview assessment.
 
 Analyze the following mock interview conversation and provide structured feedback.
+${voiceMetricsInfo}
 
 Evaluate on a scale of 1–10:
-- Communication skills
-- Technical knowledge
-- Confidence
-- Problem-solving ability
+- Communication skills (clarity, articulation, listening)
+- Technical knowledge (accuracy, depth, relevance)
+- Confidence (composure, self-assurance, handling pressure)
+- Problem-solving ability (analytical thinking, approach, creativity)
+${voiceEnabled ? `
+Also evaluate voice/speaking skills:
+- Fluency (smooth flow of speech without breaks)
+- Grammar accuracy (correct sentence structure)
+- Fear reduction progress (improvement in nervousness)
+- Voice clarity (articulation and pronunciation)` : ""}
 
 Also provide:
-- Key strengths (3-5 bullet points)
-- Areas of improvement (3-5 bullet points)
-- Overall readiness verdict (READY or NEEDS_PRACTICE)
-- Short improvement advice (max 5 lines)
+- Key strengths (3-5 specific, actionable bullet points)
+- Areas of improvement (3-5 specific, actionable bullet points)
+- Overall readiness verdict (READY if scores average 7+ otherwise NEEDS_PRACTICE)
+- Short improvement advice (max 5 lines, practical and encouraging)
 
 Respond ONLY in valid JSON format with this structure:
 {
@@ -58,7 +92,7 @@ Respond ONLY in valid JSON format with this structure:
   "strengths": string[],
   "improvements": string[],
   "finalVerdict": "READY" | "NEEDS_PRACTICE",
-  "improvementAdvice": string
+  "improvementAdvice": string${voiceFeedbackSchema}
 }`;
 
       const conversationText = conversation?.map(m => 

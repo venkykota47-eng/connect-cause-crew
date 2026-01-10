@@ -15,6 +15,23 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useVoiceInterview } from "@/hooks/useVoiceInterview";
 import { supabase } from "@/integrations/supabase/client";
 import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+  Legend,
+} from "recharts";
+import {
   MessageCircle,
   Send,
   Play,
@@ -38,6 +55,11 @@ import {
   VolumeX,
   Heart,
   BookOpen,
+  BarChart3,
+  Brain,
+  Zap,
+  Clock,
+  Languages,
 } from "lucide-react";
 
 type Difficulty = "EASY" | "MEDIUM" | "HARD";
@@ -51,6 +73,15 @@ interface Message {
   timestamp: Date;
 }
 
+interface VoiceFeedback {
+  fluencyScore: number;
+  grammarScore: number;
+  fearReductionScore: number;
+  hesitationCount: number;
+  wordsPerMinute: number;
+  voiceClarityScore: number;
+}
+
 interface Feedback {
   communication: number;
   technical: number;
@@ -60,6 +91,7 @@ interface Feedback {
   improvements: string[];
   finalVerdict: "READY" | "NEEDS_PRACTICE";
   improvementAdvice: string;
+  voiceFeedback?: VoiceFeedback;
 }
 
 interface InterviewSession {
@@ -72,6 +104,23 @@ interface InterviewSession {
   overall_score: number | null;
   started_at: string;
   ended_at: string | null;
+  voice_enabled?: boolean;
+}
+
+interface InterviewFeedback {
+  id: string;
+  session_id: string;
+  communication_score: number | null;
+  technical_score: number | null;
+  confidence_score: number | null;
+  problem_solving_score: number | null;
+  fluency_score: number | null;
+  grammar_score: number | null;
+  fear_reduction_score: number | null;
+  hesitation_count: number | null;
+  words_per_minute: number | null;
+  voice_clarity_score: number | null;
+  created_at: string;
 }
 
 const MockInterview = () => {
@@ -84,7 +133,8 @@ const MockInterview = () => {
   const [company, setCompany] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>("MEDIUM");
   const [interviewType, setInterviewType] = useState<InterviewType>("TECHNICAL");
-  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(true); // Voice enabled by default
+  const [readQuestionsAloud, setReadQuestionsAloud] = useState(true); // Optional TTS for questions
   
   // Session state
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("idle");
@@ -94,8 +144,14 @@ const MockInterview = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   
+  // Voice metrics tracking
+  const [voiceStartTime, setVoiceStartTime] = useState<number | null>(null);
+  const [totalWordCount, setTotalWordCount] = useState(0);
+  const [hesitationCount, setHesitationCount] = useState(0);
+  
   // History state
   const [pastSessions, setPastSessions] = useState<InterviewSession[]>([]);
+  const [pastFeedbacks, setPastFeedbacks] = useState<InterviewFeedback[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
 
   // Voice interview hook
@@ -113,6 +169,22 @@ const MockInterview = () => {
     onTranscript: (text) => {
       if (voiceEnabled && sessionStatus === "in_progress") {
         setInputMessage(text);
+        // Track word count for WPM calculation
+        const words = text.trim().split(/\s+/).filter(w => w.length > 0);
+        setTotalWordCount(prev => prev + words.length);
+        // Detect hesitations (repeated words, filler words)
+        const hesitations = (text.match(/\b(um|uh|er|like|you know|basically)\b/gi) || []).length;
+        if (hesitations > 0) {
+          setHesitationCount(prev => prev + hesitations);
+        }
+      }
+    },
+    onSpeechEnd: () => {
+      // Auto-submit when speech ends in voice mode
+      if (voiceEnabled && sessionStatus === "in_progress" && inputMessage.trim()) {
+        setTimeout(() => {
+          sendMessage();
+        }, 500);
       }
     },
   });
@@ -131,6 +203,7 @@ const MockInterview = () => {
   useEffect(() => {
     if (profile?.id) {
       fetchPastSessions();
+      fetchPastFeedbacks();
     }
   }, [profile?.id]);
 
@@ -147,7 +220,7 @@ const MockInterview = () => {
         .select("*")
         .eq("user_id", profile.id)
         .order("created_at", { ascending: false })
-        .limit(10);
+        .limit(20);
 
       if (error) throw error;
       setPastSessions((data as InterviewSession[]) || []);
@@ -155,6 +228,27 @@ const MockInterview = () => {
       console.error("Error fetching past sessions:", error);
     } finally {
       setLoadingHistory(false);
+    }
+  };
+
+  const fetchPastFeedbacks = async () => {
+    if (!profile?.id) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from("mock_interview_feedback")
+        .select(`
+          *,
+          mock_interview_sessions!inner(user_id)
+        `)
+        .eq("mock_interview_sessions.user_id", profile.id)
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+      setPastFeedbacks((data as unknown as InterviewFeedback[]) || []);
+    } catch (error) {
+      console.error("Error fetching past feedbacks:", error);
     }
   };
 
@@ -179,6 +273,9 @@ const MockInterview = () => {
 
     setIsLoading(true);
     setSessionStatus("configuring");
+    setVoiceStartTime(Date.now());
+    setTotalWordCount(0);
+    setHesitationCount(0);
 
     try {
       // Create session in database
@@ -191,6 +288,7 @@ const MockInterview = () => {
           difficulty,
           interview_type: interviewType,
           status: "IN_PROGRESS",
+          voice_enabled: voiceEnabled,
         })
         .select()
         .single();
@@ -209,6 +307,7 @@ const MockInterview = () => {
           company,
           difficulty,
           interviewType,
+          voiceEnabled,
         },
       });
 
@@ -230,15 +329,15 @@ const MockInterview = () => {
         message: data.message,
       });
 
-      // Speak AI message if voice is enabled
-      if (voiceEnabled && voiceSupported) {
+      // Speak AI message if read aloud is enabled
+      if (readQuestionsAloud && voiceSupported) {
         speak(data.message);
       }
 
       toast({
         title: voiceEnabled ? "Voice Interview Started" : "Interview Started",
         description: voiceEnabled 
-          ? "Listen to the question and click the microphone to answer."
+          ? "Click the microphone to answer when ready."
           : "Good luck! Answer the interviewer's questions.",
       });
 
@@ -304,6 +403,7 @@ const MockInterview = () => {
           company,
           difficulty,
           interviewType,
+          voiceEnabled,
         },
       });
 
@@ -325,8 +425,8 @@ const MockInterview = () => {
         message: data.message,
       });
 
-      // Speak AI message if voice is enabled
-      if (voiceEnabled && voiceSupported) {
+      // Speak AI message if read aloud is enabled
+      if (readQuestionsAloud && voiceSupported) {
         speak(data.message);
       }
 
@@ -365,6 +465,10 @@ const MockInterview = () => {
     setSessionStatus("generating_feedback");
     setIsLoading(true);
 
+    // Calculate voice metrics
+    const duration = voiceStartTime ? (Date.now() - voiceStartTime) / 60000 : 5; // minutes
+    const wpm = Math.round(totalWordCount / Math.max(duration, 1));
+
     try {
       const conversation = (conversationMessages || messages).map((m) => ({
         role: m.sender,
@@ -380,6 +484,13 @@ const MockInterview = () => {
           company,
           difficulty,
           interviewType,
+          voiceEnabled,
+          voiceMetrics: voiceEnabled ? {
+            hesitationCount,
+            wordsPerMinute: wpm,
+            totalWords: totalWordCount,
+            durationMinutes: duration,
+          } : null,
         },
       });
 
@@ -389,12 +500,21 @@ const MockInterview = () => {
       setFeedback(feedbackData);
 
       // Calculate overall score
-      const overallScore = Math.round(
-        (feedbackData.communication + 
-         feedbackData.technical + 
-         feedbackData.confidence + 
-         feedbackData.problemSolving) / 4 * 10
-      );
+      const baseScores = [
+        feedbackData.communication,
+        feedbackData.technical,
+        feedbackData.confidence,
+        feedbackData.problemSolving,
+      ];
+      
+      const voiceScores = feedbackData.voiceFeedback ? [
+        feedbackData.voiceFeedback.fluencyScore,
+        feedbackData.voiceFeedback.grammarScore,
+        feedbackData.voiceFeedback.voiceClarityScore,
+      ] : [];
+
+      const allScores = [...baseScores, ...voiceScores];
+      const overallScore = Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length * 10);
 
       // Update session in database
       await supabase
@@ -417,10 +537,17 @@ const MockInterview = () => {
         improvements: feedbackData.improvements,
         final_verdict: feedbackData.finalVerdict,
         improvement_advice: feedbackData.improvementAdvice,
+        fluency_score: feedbackData.voiceFeedback?.fluencyScore || null,
+        grammar_score: feedbackData.voiceFeedback?.grammarScore || null,
+        fear_reduction_score: feedbackData.voiceFeedback?.fearReductionScore || null,
+        hesitation_count: feedbackData.voiceFeedback?.hesitationCount || hesitationCount,
+        words_per_minute: feedbackData.voiceFeedback?.wordsPerMinute || wpm,
+        voice_clarity_score: feedbackData.voiceFeedback?.voiceClarityScore || null,
       });
 
       setSessionStatus("completed");
       fetchPastSessions();
+      fetchPastFeedbacks();
 
       toast({
         title: "Interview Completed!",
@@ -449,10 +576,24 @@ const MockInterview = () => {
     setCompany("");
     setDifficulty("MEDIUM");
     setInterviewType("TECHNICAL");
+    setVoiceStartTime(null);
+    setTotalWordCount(0);
+    setHesitationCount(0);
   };
 
   const downloadReport = () => {
     if (!feedback) return;
+
+    const voiceSection = feedback.voiceFeedback ? `
+Voice Metrics
+-------------
+Fluency Score: ${feedback.voiceFeedback.fluencyScore}/10
+Grammar Accuracy: ${feedback.voiceFeedback.grammarScore}/10
+Voice Clarity: ${feedback.voiceFeedback.voiceClarityScore}/10
+Fear Reduction Progress: ${feedback.voiceFeedback.fearReductionScore}/10
+Speaking Speed: ${feedback.voiceFeedback.wordsPerMinute} WPM
+Hesitations Detected: ${feedback.voiceFeedback.hesitationCount}
+` : "";
 
     const reportContent = `
 MOCK INTERVIEW REPORT
@@ -464,15 +605,16 @@ Job Role: ${jobRole}
 Company: ${company || "Not specified"}
 Difficulty: ${difficulty}
 Interview Type: ${interviewType}
+Voice Mode: ${voiceEnabled ? "Enabled" : "Disabled"}
 Date: ${new Date().toLocaleDateString()}
 
-Evaluation Scores
------------------
+Core Evaluation Scores
+-----------------------
 Communication: ${feedback.communication}/10
 Technical Knowledge: ${feedback.technical}/10
 Confidence: ${feedback.confidence}/10
 Problem Solving: ${feedback.problemSolving}/10
-
+${voiceSection}
 Overall Score: ${Math.round((feedback.communication + feedback.technical + feedback.confidence + feedback.problemSolving) / 4 * 10)}%
 
 Key Strengths
@@ -515,14 +657,84 @@ ${messages.map((m) => `${m.sender === "AI" ? "Interviewer" : "Candidate"}: ${m.c
   };
 
   const getScoreBg = (score: number) => {
-    if (score >= 8) return "bg-green-100";
-    if (score >= 6) return "bg-yellow-100";
-    return "bg-red-100";
+    if (score >= 8) return "bg-green-100 dark:bg-green-950/30";
+    if (score >= 6) return "bg-yellow-100 dark:bg-yellow-950/30";
+    return "bg-red-100 dark:bg-red-950/30";
   };
+
+  // Analytics data preparation
+  const getAnalyticsData = () => {
+    const completedSessions = pastSessions.filter(s => s.status === "COMPLETED" && s.overall_score);
+    
+    // Progress over time
+    const progressData = completedSessions
+      .slice(0, 10)
+      .reverse()
+      .map((session, index) => ({
+        session: `#${index + 1}`,
+        score: session.overall_score || 0,
+        date: new Date(session.started_at).toLocaleDateString(),
+        type: session.interview_type,
+      }));
+
+    // Score by interview type
+    const typeScores: Record<string, { total: number; count: number }> = {};
+    completedSessions.forEach(session => {
+      const type = session.interview_type;
+      if (!typeScores[type]) {
+        typeScores[type] = { total: 0, count: 0 };
+      }
+      typeScores[type].total += session.overall_score || 0;
+      typeScores[type].count += 1;
+    });
+
+    const typeData = Object.entries(typeScores).map(([type, data]) => ({
+      type,
+      average: Math.round(data.total / data.count),
+    }));
+
+    // Skills radar data from latest feedback
+    const latestFeedback = pastFeedbacks[0];
+    const radarData = latestFeedback ? [
+      { skill: "Communication", value: latestFeedback.communication_score || 0, fullMark: 10 },
+      { skill: "Technical", value: latestFeedback.technical_score || 0, fullMark: 10 },
+      { skill: "Confidence", value: latestFeedback.confidence_score || 0, fullMark: 10 },
+      { skill: "Problem Solving", value: latestFeedback.problem_solving_score || 0, fullMark: 10 },
+      { skill: "Fluency", value: latestFeedback.fluency_score || 5, fullMark: 10 },
+      { skill: "Grammar", value: latestFeedback.grammar_score || 5, fullMark: 10 },
+    ] : [];
+
+    // Voice metrics trends
+    const voiceData = pastFeedbacks
+      .filter(f => f.fluency_score !== null)
+      .slice(0, 10)
+      .reverse()
+      .map((feedback, index) => ({
+        session: `#${index + 1}`,
+        fluency: feedback.fluency_score || 0,
+        grammar: feedback.grammar_score || 0,
+        clarity: feedback.voice_clarity_score || 0,
+        wpm: feedback.words_per_minute || 0,
+      }));
+
+    return { progressData, typeData, radarData, voiceData };
+  };
+
+  const { progressData, typeData, radarData, voiceData } = getAnalyticsData();
+
+  // Calculate summary stats
+  const completedCount = pastSessions.filter(s => s.status === "COMPLETED").length;
+  const averageScore = completedCount > 0
+    ? Math.round(pastSessions.filter(s => s.status === "COMPLETED" && s.overall_score).reduce((acc, s) => acc + (s.overall_score || 0), 0) / completedCount)
+    : 0;
+  const readyCount = pastFeedbacks.filter(f => (f as any).final_verdict === "READY").length;
+  const improvementRate = completedCount > 1 && progressData.length >= 2
+    ? progressData[progressData.length - 1]?.score - progressData[0]?.score
+    : 0;
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold mb-2 flex items-center justify-center gap-3">
             <Bot className="h-8 w-8 text-primary" />
@@ -530,19 +742,23 @@ ${messages.map((m) => `${m.sender === "AI" ? "Interviewer" : "Candidate"}: ${m.c
           </h1>
           <p className="text-muted-foreground max-w-2xl mx-auto">
             Practice interviews with our AI interviewer. Get real-time questions, 
-            feedback, and a detailed performance report.
+            voice feedback, and detailed performance analytics.
           </p>
         </div>
 
         <Tabs defaultValue="interview" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
+          <TabsList className="grid w-full grid-cols-3 mb-6">
             <TabsTrigger value="interview" className="flex items-center gap-2">
               <MessageCircle className="h-4 w-4" />
               Interview
             </TabsTrigger>
+            <TabsTrigger value="analytics" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Analytics
+            </TabsTrigger>
             <TabsTrigger value="history" className="flex items-center gap-2">
               <History className="h-4 w-4" />
-              Past Sessions
+              History
             </TabsTrigger>
           </TabsList>
 
@@ -639,25 +855,48 @@ ${messages.map((m) => `${m.sender === "AI" ? "Interviewer" : "Candidate"}: ${m.c
                     </div>
                   </div>
 
-                  {/* Voice Mode Toggle */}
-                  <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/50">
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <Mic className="h-4 w-4 text-primary" />
-                        <Label htmlFor="voice-mode" className="font-medium">Voice Interview Mode</Label>
+                  {/* Voice Settings */}
+                  <div className="space-y-4 p-4 rounded-lg border bg-muted/50">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <Mic className="h-4 w-4 text-primary" />
+                      Voice Settings
+                    </h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Voice Input Toggle */}
+                      <div className="flex items-center justify-between p-3 rounded-lg border bg-background">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="voice-mode" className="font-medium text-sm">Voice Input</Label>
+                          <p className="text-xs text-muted-foreground">
+                            {voiceSupported 
+                              ? "Speak your answers (primary input)"
+                              : "Not supported in this browser"}
+                          </p>
+                        </div>
+                        <Switch
+                          id="voice-mode"
+                          checked={voiceEnabled}
+                          onCheckedChange={setVoiceEnabled}
+                          disabled={!voiceSupported}
+                        />
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        {voiceSupported 
-                          ? "Speak your answers and hear AI questions aloud"
-                          : "Voice features not supported in this browser"}
-                      </p>
+
+                      {/* Read Questions Aloud Toggle */}
+                      <div className="flex items-center justify-between p-3 rounded-lg border bg-background">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="read-aloud" className="font-medium text-sm">Read Questions Aloud</Label>
+                          <p className="text-xs text-muted-foreground">
+                            AI speaks questions (optional)
+                          </p>
+                        </div>
+                        <Switch
+                          id="read-aloud"
+                          checked={readQuestionsAloud}
+                          onCheckedChange={setReadQuestionsAloud}
+                          disabled={!voiceSupported}
+                        />
+                      </div>
                     </div>
-                    <Switch
-                      id="voice-mode"
-                      checked={voiceEnabled}
-                      onCheckedChange={setVoiceEnabled}
-                      disabled={!voiceSupported}
-                    />
                   </div>
 
                   {/* Interview Type Description */}
@@ -686,7 +925,7 @@ ${messages.map((m) => `${m.sender === "AI" ? "Interviewer" : "Candidate"}: ${m.c
                           </p>
                           {!voiceEnabled && (
                             <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
-                              💡 Tip: Enable Voice Mode for the best experience!
+                              💡 Tip: Enable Voice Input for the best experience!
                             </p>
                           )}
                         </div>
@@ -728,6 +967,7 @@ ${messages.map((m) => `${m.sender === "AI" ? "Interviewer" : "Candidate"}: ${m.c
                         </CardTitle>
                         <CardDescription>
                           {company && `${company} • `}{difficulty} • {interviewType}
+                          {voiceEnabled && " • 🎤 Voice Mode"}
                         </CardDescription>
                       </div>
                       <Button
@@ -801,7 +1041,7 @@ ${messages.map((m) => `${m.sender === "AI" ? "Interviewer" : "Candidate"}: ${m.c
                       </div>
                     ) : (
                       <div className="p-4 border-t space-y-3">
-                        {/* Voice Controls */}
+                        {/* Voice Controls - Primary */}
                         {voiceEnabled && (
                           <div className="flex items-center justify-center gap-4 pb-3 border-b">
                             {isSpeaking && (
@@ -820,17 +1060,17 @@ ${messages.map((m) => `${m.sender === "AI" ? "Interviewer" : "Candidate"}: ${m.c
                               size="lg"
                               onClick={handleVoiceToggle}
                               disabled={isLoading || isSpeaking}
-                              className="gap-2 min-w-[160px]"
+                              className="gap-2 min-w-[180px]"
                             >
                               {isListening ? (
                                 <>
                                   <MicOff className="h-5 w-5" />
-                                  Stop Recording
+                                  Stop & Send
                                 </>
                               ) : (
                                 <>
                                   <Mic className="h-5 w-5" />
-                                  Start Recording
+                                  🎤 Speak Answer
                                 </>
                               )}
                             </Button>
@@ -853,10 +1093,10 @@ ${messages.map((m) => `${m.sender === "AI" ? "Interviewer" : "Candidate"}: ${m.c
                           </div>
                         )}
 
-                        {/* Text Input */}
+                        {/* Text Input - Secondary when voice enabled */}
                         <div className="flex gap-2">
                           <Input
-                            placeholder={voiceEnabled ? "Or type your answer..." : "Type your answer..."}
+                            placeholder={voiceEnabled ? "Or type here..." : "Type your answer..."}
                             value={inputMessage}
                             onChange={(e) => setInputMessage(e.target.value)}
                             onKeyPress={(e) => e.key === "Enter" && sendMessage()}
@@ -868,7 +1108,7 @@ ${messages.map((m) => `${m.sender === "AI" ? "Interviewer" : "Candidate"}: ${m.c
                         </div>
                         <p className="text-xs text-muted-foreground">
                           {voiceEnabled 
-                            ? "Tip: Click 'Start Recording' to speak, or type below. Say 'end interview' when done."
+                            ? "💡 Click '🎤 Speak Answer' to record. Say 'end interview' when done."
                             : "Tip: Say 'end interview' when you're ready to finish and get feedback."}
                         </p>
                       </div>
@@ -902,8 +1142,23 @@ ${messages.map((m) => `${m.sender === "AI" ? "Interviewer" : "Candidate"}: ${m.c
                     </div>
                     <div className="flex items-start gap-2">
                       <AlertCircle className="h-4 w-4 text-yellow-500 mt-0.5" />
-                      <span>Avoid one-word answers</span>
+                      <span>Avoid filler words (um, uh, like)</span>
                     </div>
+                    {voiceEnabled && (
+                      <>
+                        <div className="flex items-start gap-2">
+                          <Mic className="h-4 w-4 text-primary mt-0.5" />
+                          <span>Speak clearly and at a steady pace</span>
+                        </div>
+                        <div className="border-t pt-3 mt-3">
+                          <p className="text-xs text-muted-foreground">
+                            <strong>Voice Stats:</strong><br />
+                            Words spoken: {totalWordCount}<br />
+                            Hesitations: {hesitationCount}
+                          </p>
+                        </div>
+                      </>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -920,7 +1175,7 @@ ${messages.map((m) => `${m.sender === "AI" ? "Interviewer" : "Candidate"}: ${m.c
                           Interview Feedback Report
                         </CardTitle>
                         <CardDescription>
-                          {jobRole} {company && `at ${company}`}
+                          {jobRole} {company && `at ${company}`} {voiceEnabled && "• 🎤 Voice Interview"}
                         </CardDescription>
                       </div>
                       <div className="flex gap-2">
@@ -960,7 +1215,7 @@ ${messages.map((m) => `${m.sender === "AI" ? "Interviewer" : "Candidate"}: ${m.c
                       </Badge>
                     </div>
 
-                    {/* Scores Grid */}
+                    {/* Core Scores Grid */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                       {[
                         { label: "Communication", score: feedback.communication, icon: MessageCircle },
@@ -980,6 +1235,60 @@ ${messages.map((m) => `${m.sender === "AI" ? "Interviewer" : "Candidate"}: ${m.c
                         </div>
                       ))}
                     </div>
+
+                    {/* Voice Feedback Metrics */}
+                    {feedback.voiceFeedback && (
+                      <div className="mb-6">
+                        <h4 className="font-semibold mb-4 flex items-center gap-2">
+                          <Mic className="h-4 w-4 text-primary" />
+                          Voice Feedback Metrics
+                        </h4>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                          <div className={`p-3 rounded-lg text-center ${getScoreBg(feedback.voiceFeedback.fluencyScore)}`}>
+                            <Languages className={`h-5 w-5 mx-auto mb-1 ${getScoreColor(feedback.voiceFeedback.fluencyScore)}`} />
+                            <p className="text-xs text-muted-foreground">Fluency</p>
+                            <p className={`text-xl font-bold ${getScoreColor(feedback.voiceFeedback.fluencyScore)}`}>
+                              {feedback.voiceFeedback.fluencyScore}/10
+                            </p>
+                          </div>
+                          <div className={`p-3 rounded-lg text-center ${getScoreBg(feedback.voiceFeedback.grammarScore)}`}>
+                            <BookOpen className={`h-5 w-5 mx-auto mb-1 ${getScoreColor(feedback.voiceFeedback.grammarScore)}`} />
+                            <p className="text-xs text-muted-foreground">Grammar</p>
+                            <p className={`text-xl font-bold ${getScoreColor(feedback.voiceFeedback.grammarScore)}`}>
+                              {feedback.voiceFeedback.grammarScore}/10
+                            </p>
+                          </div>
+                          <div className={`p-3 rounded-lg text-center ${getScoreBg(feedback.voiceFeedback.voiceClarityScore)}`}>
+                            <Volume2 className={`h-5 w-5 mx-auto mb-1 ${getScoreColor(feedback.voiceFeedback.voiceClarityScore)}`} />
+                            <p className="text-xs text-muted-foreground">Clarity</p>
+                            <p className={`text-xl font-bold ${getScoreColor(feedback.voiceFeedback.voiceClarityScore)}`}>
+                              {feedback.voiceFeedback.voiceClarityScore}/10
+                            </p>
+                          </div>
+                          <div className={`p-3 rounded-lg text-center ${getScoreBg(feedback.voiceFeedback.fearReductionScore)}`}>
+                            <Heart className={`h-5 w-5 mx-auto mb-1 ${getScoreColor(feedback.voiceFeedback.fearReductionScore)}`} />
+                            <p className="text-xs text-muted-foreground">Confidence</p>
+                            <p className={`text-xl font-bold ${getScoreColor(feedback.voiceFeedback.fearReductionScore)}`}>
+                              {feedback.voiceFeedback.fearReductionScore}/10
+                            </p>
+                          </div>
+                          <div className="p-3 rounded-lg text-center bg-muted">
+                            <Zap className="h-5 w-5 mx-auto mb-1 text-primary" />
+                            <p className="text-xs text-muted-foreground">Speed</p>
+                            <p className="text-xl font-bold text-foreground">
+                              {feedback.voiceFeedback.wordsPerMinute} WPM
+                            </p>
+                          </div>
+                          <div className={`p-3 rounded-lg text-center ${feedback.voiceFeedback.hesitationCount <= 3 ? "bg-green-100 dark:bg-green-950/30" : feedback.voiceFeedback.hesitationCount <= 6 ? "bg-yellow-100 dark:bg-yellow-950/30" : "bg-red-100 dark:bg-red-950/30"}`}>
+                            <Clock className={`h-5 w-5 mx-auto mb-1 ${feedback.voiceFeedback.hesitationCount <= 3 ? "text-green-600" : feedback.voiceFeedback.hesitationCount <= 6 ? "text-yellow-600" : "text-red-600"}`} />
+                            <p className="text-xs text-muted-foreground">Hesitations</p>
+                            <p className={`text-xl font-bold ${feedback.voiceFeedback.hesitationCount <= 3 ? "text-green-600" : feedback.voiceFeedback.hesitationCount <= 6 ? "text-yellow-600" : "text-red-600"}`}>
+                              {feedback.voiceFeedback.hesitationCount}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Overall Score */}
                     <div className="text-center mb-6">
@@ -1040,6 +1349,204 @@ ${messages.map((m) => `${m.sender === "AI" ? "Interviewer" : "Candidate"}: ${m.c
             )}
           </TabsContent>
 
+          <TabsContent value="analytics">
+            <div className="space-y-6">
+              {/* Summary Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-primary/10">
+                        <Target className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold">{completedCount}</p>
+                        <p className="text-sm text-muted-foreground">Interviews</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950/30">
+                        <BarChart3 className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold">{averageScore}%</p>
+                        <p className="text-sm text-muted-foreground">Avg Score</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-green-100 dark:bg-green-950/30">
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold">{readyCount}</p>
+                        <p className="text-sm text-muted-foreground">Ready</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${improvementRate >= 0 ? "bg-green-100 dark:bg-green-950/30" : "bg-red-100 dark:bg-red-950/30"}`}>
+                        <TrendingUp className={`h-5 w-5 ${improvementRate >= 0 ? "text-green-600" : "text-red-600"}`} />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold">{improvementRate >= 0 ? "+" : ""}{improvementRate}%</p>
+                        <p className="text-sm text-muted-foreground">Growth</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {completedCount === 0 ? (
+                <Card>
+                  <CardContent className="py-12 text-center">
+                    <BarChart3 className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                    <h3 className="font-medium mb-2">No Analytics Data Yet</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Complete your first interview to see performance analytics.
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Progress Over Time */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4" />
+                        Progress Over Time
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <AreaChart data={progressData}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                          <XAxis dataKey="session" className="text-xs" />
+                          <YAxis domain={[0, 100]} className="text-xs" />
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: 'hsl(var(--background))', 
+                              border: '1px solid hsl(var(--border))',
+                              borderRadius: '8px'
+                            }}
+                          />
+                          <Area 
+                            type="monotone" 
+                            dataKey="score" 
+                            stroke="hsl(var(--primary))" 
+                            fill="hsl(var(--primary))" 
+                            fillOpacity={0.2}
+                            name="Score %"
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+
+                  {/* Score by Interview Type */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <BarChart3 className="h-4 w-4" />
+                        Average by Type
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <BarChart data={typeData} layout="vertical">
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                          <XAxis type="number" domain={[0, 100]} className="text-xs" />
+                          <YAxis dataKey="type" type="category" width={100} className="text-xs" />
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: 'hsl(var(--background))', 
+                              border: '1px solid hsl(var(--border))',
+                              borderRadius: '8px'
+                            }}
+                          />
+                          <Bar dataKey="average" fill="hsl(var(--primary))" name="Avg Score %" radius={4} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+
+                  {/* Skills Radar */}
+                  {radarData.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm flex items-center gap-2">
+                          <Brain className="h-4 w-4" />
+                          Skills Assessment
+                        </CardTitle>
+                        <CardDescription>Latest interview performance</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={250}>
+                          <RadarChart data={radarData}>
+                            <PolarGrid />
+                            <PolarAngleAxis dataKey="skill" className="text-xs" />
+                            <PolarRadiusAxis domain={[0, 10]} />
+                            <Radar 
+                              name="Score" 
+                              dataKey="value" 
+                              stroke="hsl(var(--primary))" 
+                              fill="hsl(var(--primary))" 
+                              fillOpacity={0.3}
+                            />
+                            <Legend />
+                          </RadarChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Voice Metrics Trend */}
+                  {voiceData.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm flex items-center gap-2">
+                          <Mic className="h-4 w-4" />
+                          Voice Metrics Trend
+                        </CardTitle>
+                        <CardDescription>Speaking performance over time</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={250}>
+                          <AreaChart data={voiceData}>
+                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                            <XAxis dataKey="session" className="text-xs" />
+                            <YAxis domain={[0, 10]} className="text-xs" />
+                            <Tooltip 
+                              contentStyle={{ 
+                                backgroundColor: 'hsl(var(--background))', 
+                                border: '1px solid hsl(var(--border))',
+                                borderRadius: '8px'
+                              }}
+                            />
+                            <Legend />
+                            <Area type="monotone" dataKey="fluency" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.1} name="Fluency" />
+                            <Area type="monotone" dataKey="grammar" stroke="#10b981" fill="#10b981" fillOpacity={0.1} name="Grammar" />
+                            <Area type="monotone" dataKey="clarity" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.1} name="Clarity" />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
           <TabsContent value="history">
             <Card>
               <CardHeader>
@@ -1069,15 +1576,20 @@ ${messages.map((m) => `${m.sender === "AI" ? "Interviewer" : "Candidate"}: ${m.c
                         key={session.id}
                         className="flex items-center justify-between p-4 border rounded-lg"
                       >
-                        <div>
-                          <h4 className="font-medium">{session.job_role}</h4>
-                          <p className="text-sm text-muted-foreground">
-                            {session.company && `${session.company} • `}
-                            {session.difficulty} • {session.interview_type}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(session.started_at).toLocaleDateString()}
-                          </p>
+                        <div className="flex items-start gap-3">
+                          {session.voice_enabled && (
+                            <Mic className="h-4 w-4 text-primary mt-1" />
+                          )}
+                          <div>
+                            <h4 className="font-medium">{session.job_role}</h4>
+                            <p className="text-sm text-muted-foreground">
+                              {session.company && `${session.company} • `}
+                              {session.difficulty} • {session.interview_type}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(session.started_at).toLocaleDateString()}
+                            </p>
+                          </div>
                         </div>
                         <div className="text-right">
                           {session.status === "COMPLETED" && session.overall_score ? (
