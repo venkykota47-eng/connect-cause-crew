@@ -348,27 +348,30 @@ export const StudyTimetablePlanner = () => {
             </div>
           </div>
 
-          {/* Progress Overview */}
+          {/* Compact Progress Overview */}
           {totalTasks > 0 && (
-            <div className="p-4 rounded-lg border bg-muted/50">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium">Overall Progress</span>
-                <span className="text-sm text-muted-foreground">
-                  {completedTasks}/{totalTasks} tasks completed
-                </span>
-              </div>
-              <Progress value={progress} className="h-2" />
-              <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                <span>{Math.round(progress)}% complete</span>
-                {studyPlan.examDate && (
-                  <span>
-                    {Math.ceil(
-                      (new Date(studyPlan.examDate).getTime() - new Date().getTime()) /
-                        (1000 * 60 * 60 * 24)
-                    )}{" "}
-                    days until exam
-                  </span>
-                )}
+            <div className="p-3 rounded-lg border bg-muted/50">
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium">Progress</span>
+                    <span className="text-xs text-muted-foreground">
+                      {completedTasks}/{totalTasks}
+                    </span>
+                  </div>
+                  <Progress value={progress} className="h-1.5" />
+                </div>
+                <div className="text-right">
+                  <span className="text-lg font-bold text-primary">{Math.round(progress)}%</span>
+                  {studyPlan.examDate && (
+                    <p className="text-[10px] text-muted-foreground">
+                      {Math.ceil(
+                        (new Date(studyPlan.examDate).getTime() - new Date().getTime()) /
+                          (1000 * 60 * 60 * 24)
+                      )}d left
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           )}
