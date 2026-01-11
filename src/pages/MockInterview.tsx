@@ -60,10 +60,15 @@ import {
   Zap,
   Clock,
   Languages,
+  GraduationCap,
+  Building2,
+  Calendar,
 } from "lucide-react";
+import { PDFReportGenerator } from "@/components/interview/PDFReportGenerator";
+import { StudyTimetablePlanner } from "@/components/interview/StudyTimetablePlanner";
 
 type Difficulty = "EASY" | "MEDIUM" | "HARD";
-type InterviewType = "TECHNICAL" | "HR" | "BEHAVIORAL" | "MIXED" | "ENGLISH_COMMUNICATION" | "CONFIDENCE_BUILDING";
+type InterviewType = "TECHNICAL" | "HR" | "BEHAVIORAL" | "MIXED" | "ENGLISH_COMMUNICATION" | "CONFIDENCE_BUILDING" | "APTITUDE_GOVERNMENT" | "APTITUDE_IT";
 type SessionStatus = "idle" | "configuring" | "in_progress" | "generating_feedback" | "completed";
 
 interface Message {
@@ -747,10 +752,14 @@ ${messages.map((m) => `${m.sender === "AI" ? "Interviewer" : "Candidate"}: ${m.c
         </div>
 
         <Tabs defaultValue="interview" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6">
+          <TabsList className="grid w-full grid-cols-4 mb-6">
             <TabsTrigger value="interview" className="flex items-center gap-2">
               <MessageCircle className="h-4 w-4" />
               Interview
+            </TabsTrigger>
+            <TabsTrigger value="study" className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              Study Plan
             </TabsTrigger>
             <TabsTrigger value="analytics" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
@@ -761,6 +770,10 @@ ${messages.map((m) => `${m.sender === "AI" ? "Interviewer" : "Candidate"}: ${m.c
               History
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="study">
+            <StudyTimetablePlanner />
+          </TabsContent>
 
           <TabsContent value="interview">
             {sessionStatus === "idle" && (
@@ -848,6 +861,18 @@ ${messages.map((m) => `${m.sender === "AI" ? "Interviewer" : "Candidate"}: ${m.c
                             <span className="flex items-center gap-2">
                               <Heart className="h-4 w-4" />
                               Confidence Building
+                            </span>
+                          </SelectItem>
+                          <SelectItem value="APTITUDE_GOVERNMENT">
+                            <span className="flex items-center gap-2">
+                              <GraduationCap className="h-4 w-4" />
+                              Aptitude - Govt Exams
+                            </span>
+                          </SelectItem>
+                          <SelectItem value="APTITUDE_IT">
+                            <span className="flex items-center gap-2">
+                              <Building2 className="h-4 w-4" />
+                              Aptitude - IT Companies
                             </span>
                           </SelectItem>
                         </SelectContent>
@@ -1178,11 +1203,16 @@ ${messages.map((m) => `${m.sender === "AI" ? "Interviewer" : "Candidate"}: ${m.c
                           {jobRole} {company && `at ${company}`} {voiceEnabled && "• 🎤 Voice Interview"}
                         </CardDescription>
                       </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" onClick={downloadReport}>
-                          <Download className="h-4 w-4 mr-2" />
-                          Download Report
-                        </Button>
+                      <div className="flex gap-2 flex-wrap">
+                        <PDFReportGenerator
+                          feedback={feedback}
+                          messages={messages}
+                          jobRole={jobRole}
+                          company={company}
+                          difficulty={difficulty}
+                          interviewType={interviewType}
+                          voiceEnabled={voiceEnabled}
+                        />
                         <Button onClick={resetInterview}>
                           <Play className="h-4 w-4 mr-2" />
                           New Interview
