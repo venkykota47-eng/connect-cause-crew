@@ -22,6 +22,87 @@ interface InterviewRequest {
   };
 }
 
+const GOVERNMENT_APTITUDE_TOPICS = `
+QUANTITATIVE APTITUDE:
+- Number System, HCF & LCM
+- Percentage, Profit & Loss
+- Simple & Compound Interest
+- Time & Work, Pipes & Cisterns
+- Speed, Time & Distance, Boats & Streams
+- Ratio & Proportion, Partnership
+- Averages, Mixtures & Alligations
+- Mensuration (2D & 3D)
+- Data Interpretation (Tables, Graphs, Charts)
+- Probability & Permutations
+
+LOGICAL REASONING:
+- Blood Relations
+- Syllogisms
+- Coding-Decoding
+- Direction Sense
+- Seating Arrangement (Linear & Circular)
+- Puzzles
+- Ranking & Order
+- Alphanumeric Series
+- Statement & Conclusions
+- Input-Output
+
+VERBAL ABILITY:
+- Reading Comprehension
+- Error Spotting
+- Fill in the Blanks
+- Para Jumbles
+- Sentence Improvement
+- Cloze Test
+- Vocabulary (Synonyms, Antonyms)
+
+GENERAL KNOWLEDGE:
+- Current Affairs
+- Static GK (History, Geography, Polity)
+- Banking & Economy Awareness
+- Computer Awareness
+`;
+
+const IT_COMPANY_APTITUDE_TOPICS = `
+QUANTITATIVE APTITUDE (TCS, Infosys, Wipro, Cognizant Style):
+- Number System & Divisibility
+- Percentage & Profit/Loss
+- Time, Speed & Distance
+- Work & Time
+- Probability
+- Permutations & Combinations
+- Averages
+- Algebra & Equations
+- Data Interpretation
+- Clocks & Calendars
+
+LOGICAL REASONING:
+- Pattern Recognition
+- Series Completion
+- Blood Relations
+- Coding-Decoding
+- Syllogisms
+- Seating Arrangement
+- Puzzles
+- Critical Reasoning
+- Data Sufficiency
+- Cubes & Dice
+
+VERBAL ABILITY:
+- Reading Comprehension
+- Sentence Completion
+- Error Detection
+- Vocabulary
+- Grammar
+
+CODING/TECHNICAL APTITUDE:
+- Output Prediction
+- Code Debugging
+- Pseudocode Analysis
+- Pattern Printing
+- Basic DSA Questions
+`;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -60,6 +141,13 @@ serve(async (req) => {
   }`
         : "";
 
+      const aptitudeFeedback = interviewType.includes("APTITUDE") 
+        ? `
+- Aptitude skills (speed, accuracy, problem-solving approach)
+- Calculation accuracy
+- Logical thinking patterns`
+        : "";
+
       systemPrompt = `You are a placement evaluation expert specializing in interview assessment.
 
 Analyze the following mock interview conversation and provide structured feedback.
@@ -67,7 +155,7 @@ ${voiceMetricsInfo}
 
 Evaluate on a scale of 1–10:
 - Communication skills (clarity, articulation, listening)
-- Technical knowledge (accuracy, depth, relevance)
+- Technical knowledge (accuracy, depth, relevance)${aptitudeFeedback}
 - Confidence (composure, self-assurance, handling pressure)
 - Problem-solving ability (analytical thinking, approach, creativity)
 ${voiceEnabled ? `
@@ -148,6 +236,50 @@ Always motivate.
 
 Your goal is confidence, not correctness.
 Focus on: Job Role: ${jobRole}, Company: ${company || "A top company"}`;
+
+      } else if (interviewType === "APTITUDE_GOVERNMENT") {
+        interviewModePrompt = `You are an expert aptitude test trainer for government exams (SSC, IBPS, RRB, SBI, etc.).
+
+Your role is to test the candidate on aptitude topics commonly asked in government exams:
+${GOVERNMENT_APTITUDE_TOPICS}
+
+Rules:
+1. Ask ONE question at a time
+2. Start with ${difficulty === "EASY" ? "basic" : difficulty === "MEDIUM" ? "intermediate" : "advanced"} level questions
+3. Give clear, well-formatted questions
+4. For calculation questions, allow mental math or rough work
+5. After each answer:
+   - Tell if correct or incorrect
+   - Explain the correct approach briefly
+   - Share quick tricks/shortcuts if applicable
+6. Cover a mix of topics: Quant, Reasoning, Verbal
+7. Track their score mentally
+
+Start with: "Welcome! Let's practice aptitude for government exams. I'll ask questions from Quantitative Aptitude, Logical Reasoning, and Verbal Ability. Ready?"
+
+Be encouraging but accurate in evaluation.`;
+
+      } else if (interviewType === "APTITUDE_IT") {
+        interviewModePrompt = `You are an expert aptitude trainer for IT company placement tests (TCS NQT, Infosys, Wipro NLTH, Cognizant GenC, Accenture, etc.).
+
+Your role is to test the candidate on aptitude topics commonly asked in IT company assessments:
+${IT_COMPANY_APTITUDE_TOPICS}
+
+Rules:
+1. Ask ONE question at a time
+2. Start with ${difficulty === "EASY" ? "basic" : difficulty === "MEDIUM" ? "moderate" : "challenging"} level questions
+3. Give clear, well-formatted questions with options when appropriate
+4. For coding output questions, provide sample code
+5. After each answer:
+   - Tell if correct or incorrect
+   - Explain the solution approach
+   - Share time-saving tips
+6. Cover: Quant, Logical Reasoning, Verbal, and Coding aptitude
+7. Keep track of performance
+
+Start with: "Welcome to IT company aptitude practice! I'll test you on the kind of questions asked by TCS, Infosys, Wipro, and similar companies. Let's begin!"
+
+Be helpful and focus on building speed and accuracy.`;
 
       } else {
         // Standard interview modes (TECHNICAL, HR, BEHAVIORAL, MIXED)
