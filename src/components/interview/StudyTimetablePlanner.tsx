@@ -1,14 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
+import { CircularProgress } from "@/components/ui/circular-progress";
 import { useToast } from "@/hooks/use-toast";
+import { createWorker } from "tesseract.js";
+import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 import {
   Calendar,
   Clock,
@@ -24,7 +27,16 @@ import {
   CheckCircle,
   Play,
   RotateCcw,
+  Bell,
+  BellOff,
+  Upload,
+  FileImage,
+  FileType,
+  Download,
 } from "lucide-react";
+
+// Set PDF.js worker
+GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs`;
 
 interface StudyTask {
   id: string;
@@ -127,6 +139,12 @@ const getCategoryIcon = (category: string) => {
 
 export const StudyTimetablePlanner = () => {
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
+  const [remindersEnabled, setRemindersEnabled] = useState(() => {
+    return localStorage.getItem("studyRemindersEnabled") === "true";
+  });
+  
   const [studyPlan, setStudyPlan] = useState<StudyPlan>(() => {
     const saved = localStorage.getItem("studyPlan");
     if (saved) {
@@ -149,6 +167,230 @@ export const StudyTimetablePlanner = () => {
   useEffect(() => {
     localStorage.setItem("studyPlan", JSON.stringify(studyPlan));
   }, [studyPlan]);
+
+  // Save reminders preference
+  useEffect(() => {
+    localStorage.setItem("studyRemindersEnabled", remindersEnabled.toString());
+  }, [remindersEnabled]);
+
+  // Request notification permission and set up reminders
+  const enableReminders = useCallback(async () => {
+    if (!("Notification" in window)) {
+      toast({
+        title: "Notifications Not Supported",
+        description: "Your browser doesn't support notifications.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    const permission = await Notification.requestPermission();
+    if (permission === "granted") {
+      setRemindersEnabled(true);
+      toast({
+        title: "Reminders Enabled",
+        description: "You'll receive study reminders for your tasks.",
+      });
+      return true;
+    } else {
+      toast({
+        title: "Permission Denied",
+        description: "Please enable notifications in your browser settings.",
+        variant: "destructive",
+      });
+      return false;
+    }
+  }, [toast]);
+
+  const disableReminders = useCallback(() => {
+    setRemindersEnabled(false);
+    toast({
+      title: "Reminders Disabled",
+      description: "You won't receive study reminders anymore.",
+    });
+  }, [toast]);
+
+  // Set up reminder intervals
+  useEffect(() => {
+    if (!remindersEnabled || studyPlan.tasks.length === 0) return;
+
+    const checkAndNotify = () => {
+      const now = new Date();
+      const today = now.toISOString().split("T")[0];
+      const currentTime = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
+      
+      const upcomingTasks = studyPlan.tasks.filter(
+        (task) => task.day === today && !task.completed && task.time === currentTime
+      );
+
+      upcomingTasks.forEach((task) => {
+        if (Notification.permission === "granted") {
+          new Notification("📚 Study Time!", {
+            body: `Time to study: ${task.topic} (${task.duration} minutes)`,
+            icon: "/favicon.ico",
+            tag: task.id,
+          });
+        }
+      });
+    };
+
+    // Check every minute
+    const interval = setInterval(checkAndNotify, 60000);
+    // Also check immediately
+    checkAndNotify();
+
+    return () => clearInterval(interval);
+  }, [remindersEnabled, studyPlan.tasks]);
+
+  // File import handlers
+  const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsProcessingFile(true);
+    
+    try {
+      let extractedText = "";
+      const fileType = file.type;
+      const fileName = file.name.toLowerCase();
+
+      if (fileType === "text/plain" || fileName.endsWith(".txt")) {
+        extractedText = await file.text();
+      } else if (fileType === "application/pdf" || fileName.endsWith(".pdf")) {
+        extractedText = await extractTextFromPDF(file);
+      } else if (fileType.startsWith("image/") || fileName.match(/\.(png|jpg|jpeg|gif|webp)$/)) {
+        extractedText = await extractTextFromImage(file);
+      } else {
+        throw new Error("Unsupported file type");
+      }
+
+      if (extractedText.trim()) {
+        const tasks = parseTextToTasks(extractedText);
+        if (tasks.length > 0) {
+          setStudyPlan((prev) => ({
+            ...prev,
+            tasks: [...prev.tasks, ...tasks],
+          }));
+          toast({
+            title: "Import Successful",
+            description: `Added ${tasks.length} tasks from ${file.name}`,
+          });
+        } else {
+          toast({
+            title: "No Tasks Found",
+            description: "Could not parse any study tasks from the file.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        toast({
+          title: "Empty File",
+          description: "No text content found in the file.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("File import error:", error);
+      toast({
+        title: "Import Failed",
+        description: "Could not process the file. Please try a different format.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessingFile(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const extractTextFromPDF = async (file: File): Promise<string> => {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await getDocument({ data: arrayBuffer }).promise;
+    let text = "";
+    
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const pageText = content.items
+        .map((item: any) => item.str)
+        .join(" ");
+      text += pageText + "\n";
+    }
+    
+    return text;
+  };
+
+  const extractTextFromImage = async (file: File): Promise<string> => {
+    const worker = await createWorker("eng");
+    const imageUrl = URL.createObjectURL(file);
+    
+    try {
+      const { data } = await worker.recognize(imageUrl);
+      return data.text;
+    } finally {
+      await worker.terminate();
+      URL.revokeObjectURL(imageUrl);
+    }
+  };
+
+  const parseTextToTasks = (text: string): StudyTask[] => {
+    const lines = text.split(/[\n\r]+/).filter((line) => line.trim().length > 3);
+    const today = new Date();
+    const tasks: StudyTask[] = [];
+
+    lines.forEach((line, index) => {
+      const cleanedLine = line.trim().replace(/^[-•*\d.)\]]+\s*/, "");
+      if (cleanedLine.length < 3 || cleanedLine.length > 100) return;
+
+      // Determine category based on keywords
+      let category: StudyTask["category"] = "aptitude";
+      const lowerLine = cleanedLine.toLowerCase();
+      
+      if (lowerLine.match(/code|program|algorithm|data structure|sql|api|system design/)) {
+        category = "technical";
+      } else if (lowerLine.match(/speak|present|communicate|english|verbal/)) {
+        category = "communication";
+      } else if (lowerLine.match(/interview|hr|behavior|tell me|strength|weakness/)) {
+        category = "behavioral";
+      } else if (lowerLine.match(/company|research|culture|about/)) {
+        category = "company";
+      }
+
+      const taskDate = new Date(today.getTime() + Math.floor(index / 4) * 24 * 60 * 60 * 1000);
+      
+      tasks.push({
+        id: crypto.randomUUID(),
+        topic: cleanedLine.slice(0, 80),
+        duration: 30,
+        category,
+        completed: false,
+        day: taskDate.toISOString().split("T")[0],
+        time: `${(9 + (index % 4) * 2).toString().padStart(2, "0")}:00`,
+      });
+    });
+
+    return tasks.slice(0, 50); // Limit to 50 tasks
+  };
+
+  const exportPlan = () => {
+    const content = studyPlan.tasks
+      .map((task) => `${task.day} ${task.time} - ${task.topic} (${task.category}, ${task.duration}min)${task.completed ? " ✓" : ""}`)
+      .join("\n");
+    
+    const blob = new Blob([content], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `study-plan-${new Date().toISOString().split("T")[0]}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    toast({
+      title: "Plan Exported",
+      description: "Your study plan has been downloaded as a text file.",
+    });
+  };
 
   const generatePlan = (type: "government" | "it_company") => {
     const template = STUDY_TEMPLATES[type];
@@ -348,33 +590,109 @@ export const StudyTimetablePlanner = () => {
             </div>
           </div>
 
-          {/* Compact Progress Overview */}
+          {/* Circular Progress & Reminders */}
           {totalTasks > 0 && (
-            <div className="p-3 rounded-lg border bg-muted/50">
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium">Progress</span>
-                    <span className="text-xs text-muted-foreground">
+            <div className="p-4 rounded-lg border bg-muted/50">
+              <div className="flex items-center gap-6">
+                <CircularProgress value={progress} size={70} strokeWidth={6}>
+                  <div className="text-center">
+                    <span className="text-sm font-bold">{Math.round(progress)}%</span>
+                  </div>
+                </CircularProgress>
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Tasks Completed</span>
+                    <span className="text-sm text-muted-foreground">
                       {completedTasks}/{totalTasks}
                     </span>
                   </div>
-                  <Progress value={progress} className="h-1.5" />
-                </div>
-                <div className="text-right">
-                  <span className="text-lg font-bold text-primary">{Math.round(progress)}%</span>
                   {studyPlan.examDate && (
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       {Math.ceil(
                         (new Date(studyPlan.examDate).getTime() - new Date().getTime()) /
                           (1000 * 60 * 60 * 24)
-                      )}d left
+                      )} days until exam
                     </p>
                   )}
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="reminders" className="text-xs">Reminders</Label>
+                    <Switch
+                      id="reminders"
+                      checked={remindersEnabled}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          enableReminders();
+                        } else {
+                          disableReminders();
+                        }
+                      }}
+                    />
+                  </div>
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    {remindersEnabled ? (
+                      <><Bell className="h-3 w-3" /> Active</>
+                    ) : (
+                      <><BellOff className="h-3 w-3" /> Off</>
+                    )}
+                  </span>
                 </div>
               </div>
             </div>
           )}
+
+          {/* File Import/Export */}
+          <div className="p-4 rounded-lg border">
+            <h4 className="font-medium mb-3 flex items-center gap-2">
+              <Upload className="h-4 w-4" />
+              Import/Export Study Plan
+            </h4>
+            <div className="flex flex-wrap gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".txt,.pdf,.png,.jpg,.jpeg,.gif,.webp"
+                onChange={handleFileImport}
+                className="hidden"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isProcessingFile}
+                className="gap-1"
+              >
+                {isProcessingFile ? (
+                  <>Processing...</>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4" />
+                    Import File
+                  </>
+                )}
+              </Button>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <FileType className="h-3 w-3" /> TXT
+                <FileText className="h-3 w-3 ml-1" /> PDF
+                <FileImage className="h-3 w-3 ml-1" /> Images
+              </div>
+              {totalTasks > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={exportPlan}
+                  className="gap-1 ml-auto"
+                >
+                  <Download className="h-4 w-4" />
+                  Export TXT
+                </Button>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Import tasks from text files, PDFs, or images (OCR). One topic per line recommended.
+            </p>
+          </div>
 
           {/* Add Custom Task */}
           <div className="p-4 rounded-lg border">
