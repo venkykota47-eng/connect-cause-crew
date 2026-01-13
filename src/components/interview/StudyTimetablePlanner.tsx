@@ -10,6 +10,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { CircularProgress } from "@/components/ui/circular-progress";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { createWorker } from "tesseract.js";
 import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 import {
@@ -177,6 +179,7 @@ const getCategoryIcon = (category: string) => {
 
 export const StudyTimetablePlanner = () => {
   const { toast } = useToast();
+  const { profile } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isProcessingFile, setIsProcessingFile] = useState(false);
   const [remindersEnabled, setRemindersEnabled] = useState(() => {
@@ -353,11 +356,29 @@ export const StudyTimetablePlanner = () => {
     });
   }, [toast]);
 
+  // Save reminder to notifications table
+  const saveReminderNotification = useCallback(async (task: StudyTask) => {
+    if (!profile?.id) return;
+    
+    try {
+      await supabase.from("notifications").insert({
+        user_id: profile.id,
+        type: "study_reminder",
+        title: "📚 Study Time!",
+        message: `Time to study: ${task.topic} (${task.duration} minutes)`,
+        related_id: task.id,
+        is_read: false,
+      });
+    } catch (error) {
+      console.error("Failed to save notification:", error);
+    }
+  }, [profile?.id]);
+
   // Set up reminder intervals
   useEffect(() => {
     if (!remindersEnabled || studyPlan.tasks.length === 0) return;
 
-    const checkAndNotify = () => {
+    const checkAndNotify = async () => {
       const now = new Date();
       const today = now.toISOString().split("T")[0];
       const currentTime = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
@@ -366,7 +387,8 @@ export const StudyTimetablePlanner = () => {
         (task) => task.day === today && !task.completed && task.time === currentTime
       );
 
-      upcomingTasks.forEach((task) => {
+      for (const task of upcomingTasks) {
+        // Send browser notification
         if (Notification.permission === "granted") {
           new Notification("📚 Study Time!", {
             body: `Time to study: ${task.topic} (${task.duration} minutes)`,
@@ -374,7 +396,10 @@ export const StudyTimetablePlanner = () => {
             tag: task.id,
           });
         }
-      });
+        
+        // Save to app notifications
+        await saveReminderNotification(task);
+      }
     };
 
     // Check every minute
@@ -383,7 +408,7 @@ export const StudyTimetablePlanner = () => {
     checkAndNotify();
 
     return () => clearInterval(interval);
-  }, [remindersEnabled, studyPlan.tasks]);
+  }, [remindersEnabled, studyPlan.tasks, saveReminderNotification]);
 
   // File import handlers
   const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -766,7 +791,7 @@ export const StudyTimetablePlanner = () => {
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   <div className="flex items-center gap-2">
-                    <Label htmlFor="reminders" className="text-xs">Reminders</Label>
+                    <Label htmlFor="reminders" className="text-xs">Notifications</Label>
                     <Switch
                       id="reminders"
                       checked={remindersEnabled}
@@ -781,7 +806,7 @@ export const StudyTimetablePlanner = () => {
                   </div>
                   <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                     {remindersEnabled ? (
-                      <><Bell className="h-3 w-3" /> Active</>
+                      <><Bell className="h-3 w-3" /> Browser + App</>
                     ) : (
                       <><BellOff className="h-3 w-3" /> Off</>
                     )}
