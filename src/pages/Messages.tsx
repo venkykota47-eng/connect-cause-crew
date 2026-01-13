@@ -15,9 +15,19 @@ import type { Tables } from "@/integrations/supabase/types";
 type Message = Tables<"messages">;
 type Profile = Tables<"profiles">;
 
+// Safe profile type for public queries (excludes email, phone)
+type SafeProfile = {
+  id: string;
+  user_id: string;
+  role: "volunteer" | "ngo";
+  full_name: string;
+  avatar_url: string | null;
+  organization_name: string | null;
+};
+
 type Conversation = {
   id: string;
-  user: Profile;
+  user: SafeProfile;
   lastMessage: Message | null;
   unreadCount: number;
 };
@@ -118,11 +128,11 @@ export default function Messages() {
         return;
       }
 
-      // Fetch profiles for these users
+      // Fetch profiles for these users (use safe_profiles to avoid exposing sensitive data)
       const { data: profilesData, error: profilesError } = await supabase
-        .from("profiles")
-        .select("*")
-        .in("id", Array.from(userIds));
+        .from("safe_profiles" as any)
+        .select("id, user_id, role, full_name, avatar_url, organization_name")
+        .in("id", Array.from(userIds)) as { data: SafeProfile[] | null; error: any };
 
       if (profilesError) throw profilesError;
 

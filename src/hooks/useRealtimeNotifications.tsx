@@ -49,12 +49,12 @@ export function useRealtimeNotifications() {
       async (payload) => {
         const message = payload.new as { sender_id: string; content: string };
         
-        // Fetch sender info
+        // Fetch sender info (use safe_profiles view to avoid exposing sensitive data)
         const { data: sender } = await supabase
-          .from("profiles")
-          .select("full_name, email")
+          .from("safe_profiles" as any)
+          .select("full_name")
           .eq("id", message.sender_id)
-          .maybeSingle();
+          .maybeSingle() as { data: { full_name: string } | null };
 
         toast.info(`New message from ${sender?.full_name || "Someone"}`, {
           description: message.content.slice(0, 50) + (message.content.length > 50 ? "..." : ""),
@@ -98,12 +98,12 @@ export function useRealtimeNotifications() {
             .maybeSingle();
 
           if (opportunity?.ngo_id === profile.id) {
-            // Fetch volunteer info
+            // Fetch volunteer info (use safe_profiles to avoid exposing sensitive data)
             const { data: volunteer } = await supabase
-              .from("profiles")
+              .from("safe_profiles" as any)
               .select("full_name")
               .eq("id", application.volunteer_id)
-              .maybeSingle();
+              .maybeSingle() as { data: { full_name: string } | null };
 
             toast.success("New Application Received!", {
               description: `${volunteer?.full_name || "A volunteer"} applied for "${opportunity.title}"`,
