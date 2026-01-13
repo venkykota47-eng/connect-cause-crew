@@ -57,6 +57,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "applications_volunteer_id_fkey"
+            columns: ["volunteer_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       messages: {
@@ -93,10 +100,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "messages_receiver_id_fkey"
+            columns: ["receiver_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "messages_sender_id_fkey"
             columns: ["sender_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -255,6 +276,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "mock_interview_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       notifications: {
@@ -294,6 +322,13 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -356,6 +391,13 @@ export type Database = {
             columns: ["ngo_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_ngo_id_fkey"
+            columns: ["ngo_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -437,7 +479,60 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      public_profiles: {
+        Row: {
+          availability: string | null
+          avatar_url: string | null
+          bio: string | null
+          created_at: string | null
+          experience_years: number | null
+          founded_year: number | null
+          full_name: string | null
+          id: string | null
+          location: string | null
+          mission: string | null
+          organization_name: string | null
+          role: Database["public"]["Enums"]["user_role"] | null
+          skills: string[] | null
+          team_size: number | null
+          website: string | null
+        }
+        Insert: {
+          availability?: string | null
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string | null
+          experience_years?: number | null
+          founded_year?: number | null
+          full_name?: string | null
+          id?: string | null
+          location?: string | null
+          mission?: string | null
+          organization_name?: string | null
+          role?: Database["public"]["Enums"]["user_role"] | null
+          skills?: string[] | null
+          team_size?: number | null
+          website?: string | null
+        }
+        Update: {
+          availability?: string | null
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string | null
+          experience_years?: number | null
+          founded_year?: number | null
+          full_name?: string | null
+          id?: string | null
+          location?: string | null
+          mission?: string | null
+          organization_name?: string | null
+          role?: Database["public"]["Enums"]["user_role"] | null
+          skills?: string[] | null
+          team_size?: number | null
+          website?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       get_public_profile_fields: {
