@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Navigate, Link } from "react-router-dom";
 import { 
   Bell, CheckCircle2, MessageSquare, Briefcase, 
-  Users, Info, Check, Trash2 
+  Users, Info, Check, Trash2, BookOpen 
 } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -104,6 +104,8 @@ export default function Notifications() {
         return <Users className="h-5 w-5 text-emerald-600" />;
       case "accepted":
         return <CheckCircle2 className="h-5 w-5 text-emerald-600" />;
+      case "study_reminder":
+        return <BookOpen className="h-5 w-5 text-orange-500" />;
       default:
         return <Info className="h-5 w-5 text-muted-foreground" />;
     }
@@ -115,6 +117,8 @@ export default function Notifications() {
         return "/applications";
       case "message":
         return "/messages";
+      case "study_reminder":
+        return "/mock-interview";
       default:
         return "#";
     }
