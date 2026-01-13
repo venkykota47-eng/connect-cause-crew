@@ -52,12 +52,12 @@ export function useSmartMatchNotifications({
 
           // Only notify for high matches (80%+)
           if (matchPercentage >= 80) {
-            // Fetch organization name
+            // Fetch organization name (use safe_profiles to avoid exposing sensitive data)
             const { data: profile } = await supabase
-              .from("profiles")
+              .from("safe_profiles" as any)
               .select("organization_name")
               .eq("id", newOpportunity.ngo_id)
-              .single();
+              .single() as { data: { organization_name: string | null } | null };
 
             const orgName = profile?.organization_name || "An organization";
 
