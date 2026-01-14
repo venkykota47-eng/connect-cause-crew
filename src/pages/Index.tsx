@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Layout } from "@/components/layout/Layout";
-import { ArrowRight, Users, Building2, Sparkles, Heart, Globe, Award, FileText, Target, TrendingUp } from "lucide-react";
+import { ArrowRight, Users, Building2, Sparkles, Heart, Globe, FileText, Target, TrendingUp, Mic, Calendar, Brain, BookOpen } from "lucide-react";
 
 const Index = () => {
   return (
@@ -204,25 +204,88 @@ const Index = () => {
         </div>
       </section>
 
-      {/* CTA Section */}
+      {/* Mock Interview & Study Plan CTA Section */}
       <section className="py-24">
         <div className="container mx-auto px-4">
           <div className="relative rounded-3xl overflow-hidden">
             <div className="absolute inset-0 gradient-hero opacity-90" />
-            <div className="relative px-8 py-16 md:py-20 text-center text-primary-foreground">
-              <Award className="w-16 h-16 mx-auto mb-6 opacity-80" />
-              <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">
-                Ready to Make a Difference?
-              </h2>
-              <p className="text-lg opacity-90 max-w-xl mx-auto mb-8">
-                Join thousands of volunteers and NGOs already creating impact together.
-              </p>
-              <Link to="/auth?mode=signup">
-                <Button size="xl" className="bg-card text-foreground hover:bg-card/90 shadow-xl">
-                  Get Started Free
-                  <ArrowRight className="w-5 h-5 ml-2" />
-                </Button>
-              </Link>
+            <div className="relative px-8 py-16 md:py-20 text-primary-foreground">
+              <div className="max-w-4xl mx-auto">
+                <div className="text-center mb-12">
+                  <Brain className="w-16 h-16 mx-auto mb-6 opacity-90" />
+                  <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">
+                    Ace Your Interviews with AI
+                  </h2>
+                  <p className="text-lg opacity-90 max-w-xl mx-auto">
+                    Practice with our AI-powered mock interviews and personalized study plans
+                  </p>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6 mb-10">
+                  {/* Mock Interview Card */}
+                  <div className="bg-card/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                        <Mic className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold">Voice Mock Interview</h3>
+                        <p className="text-sm opacity-80">AI-Powered Practice</p>
+                      </div>
+                    </div>
+                    <ul className="space-y-2 text-sm opacity-90 mb-4">
+                      <li className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4" />
+                        Real-time voice conversations
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Target className="w-4 h-4" />
+                        Technical, HR & Behavioral rounds
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4" />
+                        Detailed feedback & scoring
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Study Plan Card */}
+                  <div className="bg-card/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                        <Calendar className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold">Smart Study Planner</h3>
+                        <p className="text-sm opacity-80">Personalized Timetables</p>
+                      </div>
+                    </div>
+                    <ul className="space-y-2 text-sm opacity-90 mb-4">
+                      <li className="flex items-center gap-2">
+                        <BookOpen className="w-4 h-4" />
+                        AI-generated study schedules
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Brain className="w-4 h-4" />
+                        Topic-wise breakdown
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        Track your progress daily
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="text-center">
+                  <Link to="/mock-interview">
+                    <Button size="xl" className="bg-card text-foreground hover:bg-card/90 shadow-xl">
+                      Start Practicing Now
+                      <ArrowRight className="w-5 h-5 ml-2" />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
             </div>
           </div>
         </div>
