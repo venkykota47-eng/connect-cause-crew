@@ -36,7 +36,6 @@ import {
   Send,
   Play,
   Square,
-  Download,
   User,
   Bot,
   Briefcase,
@@ -50,9 +49,7 @@ import {
   History,
   Star,
   Mic,
-  MicOff,
   Volume2,
-  VolumeX,
   Heart,
   BookOpen,
   BarChart3,
@@ -66,6 +63,7 @@ import {
 } from "lucide-react";
 import { PDFReportGenerator } from "@/components/interview/PDFReportGenerator";
 import { StudyTimetablePlanner } from "@/components/interview/StudyTimetablePlanner";
+import { VoiceControls } from "@/components/interview/VoiceControls";
 
 type Difficulty = "EASY" | "MEDIUM" | "HARD";
 type InterviewType = "TECHNICAL" | "HR" | "BEHAVIORAL" | "MIXED" | "ENGLISH_COMMUNICATION" | "CONFIDENCE_BUILDING" | "APTITUDE_GOVERNMENT" | "APTITUDE_IT";
@@ -159,21 +157,28 @@ const MockInterview = () => {
   const [pastFeedbacks, setPastFeedbacks] = useState<InterviewFeedback[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
 
-  // Voice interview hook
+  // Voice interview hook with enhanced features
   const {
     isListening,
     isSpeaking,
+    isPaused,
     transcript,
+    interimTranscript,
+    audioLevel,
+    confidence,
     startListening,
     stopListening,
+    pauseListening,
+    resumeListening,
     speak,
     stopSpeaking,
     isSupported: voiceSupported,
     error: voiceError,
+    clearError,
   } = useVoiceInterview({
     onTranscript: (text) => {
       if (voiceEnabled && sessionStatus === "in_progress") {
-        setInputMessage(text);
+        setInputMessage(prev => prev ? prev + " " + text : text);
         // Track word count for WPM calculation
         const words = text.trim().split(/\s+/).filter(w => w.length > 0);
         setTotalWordCount(prev => prev + words.length);
@@ -184,14 +189,17 @@ const MockInterview = () => {
         }
       }
     },
-    onSpeechEnd: () => {
-      // Auto-submit when speech ends in voice mode
-      if (voiceEnabled && sessionStatus === "in_progress" && inputMessage.trim()) {
-        setTimeout(() => {
-          sendMessage();
-        }, 500);
+    onInterimTranscript: (text) => {
+      // Real-time feedback while speaking
+      if (voiceEnabled && sessionStatus === "in_progress") {
+        // Could use for live preview
       }
     },
+    onSpeechEnd: () => {
+      // Auto-submit handled by silence detection in the hook
+    },
+    silenceTimeout: 2500, // Auto-submit after 2.5s of silence
+    autoRestart: false, // Don't auto-restart after submission
   });
 
   // Show voice error
@@ -202,8 +210,9 @@ const MockInterview = () => {
         description: voiceError,
         variant: "destructive",
       });
+      clearError();
     }
-  }, [voiceError, toast]);
+  }, [voiceError, toast, clearError]);
 
   useEffect(() => {
     if (profile?.id) {
@@ -1066,76 +1075,51 @@ ${messages.map((m) => `${m.sender === "AI" ? "Interviewer" : "Candidate"}: ${m.c
                       </div>
                     ) : (
                       <div className="p-4 border-t space-y-3">
-                        {/* Voice Controls - Primary */}
+                        {/* Enhanced Voice Controls */}
                         {voiceEnabled && (
-                          <div className="flex items-center justify-center gap-4 pb-3 border-b">
-                            {isSpeaking && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={handleStopSpeaking}
-                                className="gap-2"
-                              >
-                                <VolumeX className="h-4 w-4" />
-                                Stop Speaking
-                              </Button>
-                            )}
-                            <Button
-                              variant={isListening ? "destructive" : "default"}
-                              size="lg"
-                              onClick={handleVoiceToggle}
-                              disabled={isLoading || isSpeaking}
-                              className="gap-2 min-w-[180px]"
-                            >
-                              {isListening ? (
-                                <>
-                                  <MicOff className="h-5 w-5" />
-                                  Stop & Send
-                                </>
-                              ) : (
-                                <>
-                                  <Mic className="h-5 w-5" />
-                                  🎤 Speak Answer
-                                </>
-                              )}
-                            </Button>
-                            {isListening && (
-                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <span className="relative flex h-3 w-3">
-                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                                </span>
-                                Listening...
-                              </div>
-                            )}
-                          </div>
+                          <VoiceControls
+                            isListening={isListening}
+                            isSpeaking={isSpeaking}
+                            isPaused={isPaused}
+                            audioLevel={audioLevel}
+                            confidence={confidence}
+                            transcript={inputMessage || transcript}
+                            interimTranscript={interimTranscript}
+                            isLoading={isLoading}
+                            voiceSupported={voiceSupported}
+                            onToggleListening={handleVoiceToggle}
+                            onStopSpeaking={handleStopSpeaking}
+                            onPause={pauseListening}
+                            onResume={resumeListening}
+                            onSend={sendMessage}
+                            hasTranscript={!!inputMessage.trim()}
+                          />
                         )}
 
-                        {/* Live Transcript */}
-                        {voiceEnabled && transcript && (
-                          <div className="p-2 bg-muted/50 rounded text-sm text-muted-foreground italic">
-                            "{transcript}"
-                          </div>
-                        )}
-
-                        {/* Text Input - Secondary when voice enabled */}
+                        {/* Text Input - Always available */}
                         <div className="flex gap-2">
                           <Input
-                            placeholder={voiceEnabled ? "Or type here..." : "Type your answer..."}
+                            placeholder={voiceEnabled ? "Or type your answer here..." : "Type your answer..."}
                             value={inputMessage}
                             onChange={(e) => setInputMessage(e.target.value)}
-                            onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+                            onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
                             disabled={isLoading}
+                            className="flex-1"
                           />
-                          <Button onClick={sendMessage} disabled={isLoading || !inputMessage.trim()}>
+                          <Button 
+                            onClick={sendMessage} 
+                            disabled={isLoading || !inputMessage.trim()}
+                            size="icon"
+                          >
                             <Send className="h-4 w-4" />
                           </Button>
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                          {voiceEnabled 
-                            ? "💡 Click '🎤 Speak Answer' to record. Say 'end interview' when done."
-                            : "Tip: Say 'end interview' when you're ready to finish and get feedback."}
-                        </p>
+                        
+                        {!voiceEnabled && (
+                          <p className="text-xs text-muted-foreground text-center">
+                            💡 Tip: Say "end interview" when you're ready to finish and get feedback.
+                          </p>
+                        )}
                       </div>
                     )}
                   </CardContent>
@@ -1175,12 +1159,33 @@ ${messages.map((m) => `${m.sender === "AI" ? "Interviewer" : "Candidate"}: ${m.c
                           <Mic className="h-4 w-4 text-primary mt-0.5" />
                           <span>Speak clearly and at a steady pace</span>
                         </div>
-                        <div className="border-t pt-3 mt-3">
-                          <p className="text-xs text-muted-foreground">
-                            <strong>Voice Stats:</strong><br />
-                            Words spoken: {totalWordCount}<br />
-                            Hesitations: {hesitationCount}
+                        <div className="border-t pt-3 mt-3 space-y-2">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                            Live Voice Stats
                           </p>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="p-2 rounded bg-muted/50">
+                              <span className="text-muted-foreground">Words spoken:</span>
+                              <span className="font-medium ml-1">{totalWordCount}</span>
+                            </div>
+                            <div className="p-2 rounded bg-muted/50">
+                              <span className="text-muted-foreground">Hesitations:</span>
+                              <span className={`font-medium ml-1 ${hesitationCount > 5 ? 'text-destructive' : hesitationCount > 2 ? 'text-yellow-600' : 'text-green-600'}`}>
+                                {hesitationCount}
+                              </span>
+                            </div>
+                          </div>
+                          {audioLevel > 0 && (
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className="text-muted-foreground">Volume:</span>
+                              <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-primary transition-all duration-75 rounded-full"
+                                  style={{ width: `${audioLevel * 100}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </>
                     )}
